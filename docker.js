@@ -429,6 +429,7 @@ var Docker = function() {
                         $("#screen").focus();
                         $("#screen").keypress(function(e) {
                             console.log("keypress", e);
+                            e.preventDefault();
                             if (e.keyCode) emit("bash-input", {name: name, text: String.fromCharCode(e.keyCode)});
                             else if (e.charCode) emit("bash-input", {name: name, text: String.fromCharCode(e.charCode)});
                             $("#screen").focus();

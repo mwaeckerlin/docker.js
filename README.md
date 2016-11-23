@@ -23,12 +23,15 @@ code snipped from usage on server side
 
 ## Client Side
 
+suggested to be used with https://github.com/mdaines/viz.js/ for rendering graphviz
+
 code snipped from usage on client side
 
     <!DOCTYPE HTML>
     <html>
       <head>
         <script type="text/javascript" src="javascripts/jquery.js"></script>
+        <script type="text/javascript" src="javascripts/viz.js"></script>
         <script type="text/javascript" src="/docker/docker.js"></script>
       </head>
       …
