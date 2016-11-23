@@ -1,0 +1,23 @@
+{
+  "name": "docker.js",
+  "version": "0.0.0",
+  "description": "NodeJS Module for Handling and Displaying Docker Information",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mwaeckerlin/docker.js.git"
+  },
+  "keywords": [
+    "nodejs",
+    "docker"
+  ],
+  "author": "Marc Wäckerlin <marc@waeckerlin.org> (https://marc.wäckerlin.ch)",
+  "license": "LGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/mwaeckerlin/docker.js/issues"
+  },
+  "homepage": "https://github.com/mwaeckerlin/docker.js#readme"
+}

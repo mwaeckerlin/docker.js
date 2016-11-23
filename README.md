@@ -1,2 +1,3 @@
 # docker.js
-NodeJS Module for Handling ans Displaying Docker Information
+
+NodeJS Module for Handling and Displaying Docker Information
