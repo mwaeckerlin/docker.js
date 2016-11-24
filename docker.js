@@ -1,4 +1,14 @@
-var Docker = function() {
+var Docker = function(socket, container_element, error) {
+
+  var focused = null;
+  var viz = null;
+  var vizmore = null;
+  var rankdir = "LR";
+
+  function emit(signal, data) {
+    console.log("<-snd "+signal, data);
+    socket.emit(signal, data);
+  }
 
   function same(array1, array2) {
     if (!array1 && !array2) return true;
@@ -88,33 +98,33 @@ var Docker = function() {
     this.Status = Object.freeze({
       Error:      {
         color: "indianred1",
-        action1: "docker.container.start",
-        action2: "docker.container.remove",
+        action1: "start",
+        action2: "remove",
         bash: false
       },
       Terminated: {
         color: "yellow2",
-        action1: "docker.container.start",
-        action2: "docker.container.remove",
+        action1: "start",
+        action2: "remove",
         bash: false
       },
       Restarting: {
         color: "lightblue",
-        action1: "docker.container.start",
-        action2: "docker.container.remove",
+        action1: "start",
+        action2: "remove",
         bash:
         false
       },
       Paused:     {
         color: "grey",
-        action1: "docker.container.unpause",
+        action1: "unpause",
         action2: null,
         bash: false
       },
       Running:    {
         color: "lightgreen",
-        action1: "docker.container.pause",
-        action2: "docker.container.stop",
+        action1: "pause",
+        action2: "stop",
         bash: true
       },
       Preview:    {
@@ -432,7 +442,7 @@ var Docker = function() {
         if (n.status.action1) {
           $("#popup").append('<button id="popup1">'+n.status.action1+'</button>');
           $("#popup1").click(function() {
-            emit(n.status.action1, name);
+            emit('docker.container.'+n.status.action1, name);
           });
         }
         $("#popup").append('<button id="popup2">'+(focused?"overview":"focus")+'</button>');
@@ -442,7 +452,7 @@ var Docker = function() {
         if (n.status.action2) {
           $("#popup").append('<button id="popup3">'+n.status.action2+'</button>');
           $("#popup3").click(function() {
-            emit(n.status.action2, name);
+            emit('docker.container.'+n.status.action2, name);
           });
         }
         $("#popup").append('<br/>');
@@ -505,6 +515,86 @@ var Docker = function() {
 
   this.images = new this.Images();
   this.containers = new this.Containers();
+
+  this.rotate() {
+    if (!viz) return;
+    if (rankdir == "LR")
+      rankdir = "TB";
+    else
+      rankdir = "LR";
+    this.show();
+  }
+
+  this.show = function(vizpath, more) {
+    if (!vizpath) {
+      vizpath = viz;
+      more = vizmore;
+    } else {
+      viz = vizpath;
+      vizmore = more;
+    }
+    res = "digraph {\n"+"  rankdir="+rankdir+";\n"+viz+"\n}";
+    try {
+      $(container_element).html(more?Viz(res)+more:Viz(res));
+      stats();
+      $(container_element+' a > ellipse + text').attr('font-size', '12');
+      $(container_element+' a > ellipse + text + text')
+        .attr('font-weight', 'bold')
+        .attr('font-size', '16')
+        .each(function() {$(this).attr('y', parseFloat($(this).attr('y'))+1.0)});
+      $(container_element+' a > ellipse + text + text + text, #main a > ellipse + text + text + text + text').attr('font-size', '10');
+    } catch(e) {
+      (res = res.split("\n")).forEach(function(v, i, a) {
+        a[i] = ("000"+(i+1)).slice(-3)+": "+v;
+      });
+      $(container_element).html("<h2>Exception Caught:</h2><p>"+e+"<p><pre>"+res.join("\n")+"</pre>");
+    }
+  }
+
+  function overview() {
+    focused = null;
+    this.show(this.containers.graph());
+  }
+
+  function details(name) {
+    if (name) focused = name;
+    else if (!focused) return overview();
+    this.show(this.containers.subgraph(focused));
+  }
+
+  function containers(c) {
+    console.log("->rcv containers");
+    this.containers.set(c);
+    if (focused && this.containers.exists(focused))
+      details(focused);
+    else
+      overview();
+  }
+  
+  var laststats=null;
+  function stats(data) {
+    if (data)
+      console.log("->rcv stats");
+    else
+      data=laststats;
+    if (!data) return;
+    var lines = data.split("\n");
+    var head = lines.shift();
+    lines.forEach(function(line) {
+      if (!line) return;
+      elements = line.split(/ +/);
+      $('#main text + text:contains("'+elements[0]+'") + text + text')
+        .html('cpu: '+elements[1]+' mem: '+elements[7]);
+      $('#main text + text:contains("'+elements[0]+'") + text')
+        .html('net: '+elements[8]+elements[9]+' '+elements[11]+elements[12]
+             +' block: '+elements[13]+elements[14]+' '+elements[16]+elements[17]);
+    });
+  }
+
+  socket
+    .on("docker.fail", error)
+    .on("docker.containers", containers)
+    .on("docker.stats", stats);
 
 }
 
