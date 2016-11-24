@@ -1,9 +1,9 @@
-module.exports = function(app, updateContainerInterval, updateStatsInterval) {
+module.exports = function(app, io, updateContainerInterval, updateStatsInterval) {
 
   var running="";
   var proc = require('child_process');
   
-  this.connect = function(io, socket) {
+  this.connect = function(socket) {
 
     var pty = require('pty.js');
     var docker = require(__dirname+'/docker.js');
