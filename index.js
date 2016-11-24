@@ -172,7 +172,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     JSON.parse(stdout).forEach(function(n) {
       if (n.State.Running) running+=" "+n.Name.replace(/^\//, '');
     });
-    if (oldcontainer!=stdout) broadcast("containers", stdout);
+    if (oldcontainer!=stdout) broadcast("docker.containers", stdout);
     oldcontainer = stdout;
   }
   
@@ -184,7 +184,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
       });
     if (oldimage && oldimage==stdout) return; // do not resend same images
     oldimage = stdout;
-    broadcast("images", stdout);
+    broadcast("docker.images", stdout);
   }
 
   function imagelist(error, stdout, stderr) {
@@ -225,7 +225,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
       return fail("get containers stats failed", {
         error: error, stderr: stderr, stdout: stdout
       });
-    broadcast("stats", stdout);
+    broadcast("docker.stats", stdout);
   }
 
   //==============================================================================
