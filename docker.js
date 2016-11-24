@@ -4,6 +4,7 @@ var Docker = function(socket, container_element, error) {
   var viz = null;
   var vizmore = null;
   var rankdir = "LR";
+  var docker = this;
 
   function emit(signal, data) {
     console.log("<-snd "+signal, data);
@@ -522,7 +523,7 @@ var Docker = function(socket, container_element, error) {
       rankdir = "TB";
     else
       rankdir = "LR";
-    show();
+    docker.show();
   }
 
   this.show = function(vizpath, more) {
@@ -543,29 +544,31 @@ var Docker = function(socket, container_element, error) {
         .attr('font-size', '16')
         .each(function() {$(this).attr('y', parseFloat($(this).attr('y'))+1.0)});
       $(container_element+' a > ellipse + text + text + text, #main a > ellipse + text + text + text + text').attr('font-size', '10');
+      docker.containers.contextmenu(container_element);
     } catch(e) {
       (res = res.split("\n")).forEach(function(v, i, a) {
         a[i] = ("000"+(i+1)).slice(-3)+": "+v;
       });
       $(container_element).html("<h2>Exception Caught:</h2><p>"+e+"<p><pre>"+res.join("\n")+"</pre>");
+      throw e;
     }
   }
 
   function overview() {
     focused = null;
-    show(containers.graph());
+    docker.show(docker.containers.graph());
   }
 
   function details(name) {
     if (name) focused = name;
     else if (!focused) return overview();
-    show(containers.subgraph(focused));
+    docker.show(docker.containers.subgraph(focused));
   }
 
   function sigcontainers(c) {
     console.log("->rcv containers");
-    containers.set(c);
-    if (focused && containers.exists(focused))
+    docker.containers.set(c);
+    if (focused && docker.containers.exists(focused))
       details(focused);
     else
       overview();
