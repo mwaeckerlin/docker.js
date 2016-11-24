@@ -1,56 +1,13 @@
-var pty = require('pty.js');
-var proc = require('child_process');
 module.exports = function(app, updateContainerInterval, updateStatsInterval) {
 
   var running="";
   
   this.connect = function(io, socket) {
 
+    var pty = require('pty.js');
+    var proc = require('child_process');
     var docker = require(__dirname+'/docker.js');
     
-    function broadcast(signal, data) {
-      console.log("<= signal: "+signal);
-      io.sockets.emit(signal, data);
-    }
-
-    function exec(cmd, callback) {
-      if (cmd.length>40) {
-        console.log("== "+cmd.slice(0, 30+cmd.slice(30).indexOf(' '))+" ...");
-      } else {
-        console.log("== "+cmd);
-      }
-      proc.exec(cmd, {maxBuffer: 10*1024*1024}, callback);
-    }
-
-    function fail(txt, data) {
-      console.log("** "+txt, data);
-    }
-
-    var oldcontainer = null;
-    function containerinspect(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("inspect docker containers failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      running = "";
-      JSON.parse(stdout).forEach(function(n) {
-        if (n.State.Running) running+=" "+n.Name.replace(/^\//, '');
-      });
-      if (oldcontainer!=stdout) broadcast("containers", stdout);
-      oldcontainer = stdout;
-    }
-    
-    var oldimage = null;
-    function imageinspect(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("inspect docker images failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      if (oldimage && oldimage==stdout) return; // do not resend same images
-      oldimage = stdout;
-      broadcast("images", stdout);
-    }
-
     function emit(signal, data, info) {
       if (typeof data == 'string' && !data.match("\n")) {
         console.log("<- signal: "+signal+"("+data+")");
@@ -187,13 +144,55 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
 
   }
 
+  function broadcast(signal, data) {
+    console.log("<= signal: "+signal);
+    io.sockets.emit(signal, data);
+  }
+
+  function exec(cmd, callback) {
+    if (cmd.length>40) {
+      console.log("== "+cmd.slice(0, 30+cmd.slice(30).indexOf(' '))+" ...");
+    } else {
+      console.log("== "+cmd);
+    }
+    proc.exec(cmd, {maxBuffer: 10*1024*1024}, callback);
+  }
+
+  function fail(txt, data) {
+    console.log("** "+txt, data);
+  }
+
+  var oldcontainer = null;
+  function containerinspect(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("inspect docker containers failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    running = "";
+    JSON.parse(stdout).forEach(function(n) {
+      if (n.State.Running) running+=" "+n.Name.replace(/^\//, '');
+    });
+    if (oldcontainer!=stdout) broadcast("containers", stdout);
+    oldcontainer = stdout;
+  }
+  
+  var oldimage = null;
+  function imageinspect(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("inspect docker images failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    if (oldimage && oldimage==stdout) return; // do not resend same images
+    oldimage = stdout;
+    broadcast("images", stdout);
+  }
+
   function imagelist(error, stdout, stderr) {
     if (error || stderr)
       return fail("list docker images failed", {
         error: error, stderr: stderr, stdout: stdout
       });
-    exec("docker inspect "+stdout.trim().replace(/\n/g, " "),
-         imageinspect);
+    exec("docker inspect "+stdout.trim().replace(/\n/g, " "), imageinspect);
   }
 
   function updateimages(error, stdout, stderr) {
