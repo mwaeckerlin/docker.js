@@ -522,7 +522,7 @@ var Docker = function(socket, container_element, error) {
       rankdir = "TB";
     else
       rankdir = "LR";
-    this.show();
+    show();
   }
 
   this.show = function(vizpath, more) {
@@ -553,19 +553,19 @@ var Docker = function(socket, container_element, error) {
 
   function overview() {
     focused = null;
-    this.show(this.containers.graph());
+    show(containers.graph());
   }
 
   function details(name) {
     if (name) focused = name;
     else if (!focused) return overview();
-    this.show(this.containers.subgraph(focused));
+    show(containers.subgraph(focused));
   }
 
   function sigcontainers(c) {
     console.log("->rcv containers");
-    this.containers.set(c);
-    if (focused && this.containers.exists(focused))
+    containers.set(c);
+    if (focused && containers.exists(focused))
       details(focused);
     else
       overview();
