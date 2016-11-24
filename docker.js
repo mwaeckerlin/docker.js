@@ -562,7 +562,7 @@ var Docker = function(socket, container_element, error) {
     this.show(this.containers.subgraph(focused));
   }
 
-  function containers(c) {
+  function sigcontainers(c) {
     console.log("->rcv containers");
     this.containers.set(c);
     if (focused && this.containers.exists(focused))
@@ -593,7 +593,7 @@ var Docker = function(socket, container_element, error) {
 
   socket
     .on("docker.fail", error)
-    .on("docker.containers", containers)
+    .on("docker.containers", sigcontainers)
     .on("docker.stats", stats);
 
 }
