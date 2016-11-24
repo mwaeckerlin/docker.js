@@ -106,7 +106,7 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
 
     function fail(txt, data) {
       console.log("** "+txt, data);
-      emit("fail", txt);
+      emit("docker.fail", txt);
     }
 
     function modify(cmd, name) {
@@ -130,13 +130,13 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
 
     function containers() {
       console.log("-> containers");
-      if (oldcontainer) emit("containers", oldcontainer);
+      if (oldcontainer) emit("docker.containers", oldcontainer);
       else updatecontainers();
     }
     
     function images() {
       console.log("-> images");
-      if (oldimage) emit("images", oldimage);
+      if (oldimage) emit("docker.images", oldimage);
       else updateimages();
     }
     
@@ -176,10 +176,10 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
       console.log("-> logs("+name+")");
       var l = proc.spawn("docker", ["logs", "-f", name])
                   .on('close', function(code) {
-                    emit('logs', {name: name, type: 'done'});
+                    emit('docker.container.logs', {name: name, type: 'done'});
                   });
       l.stdout.on('data', function(data) {
-        emit('logs', {name: name, type: 'stdout', text: data.toString()});
+        emit('docker.container.logs', {name: name, type: 'stdout', text: data.toString()});
       });
     }
 
@@ -191,10 +191,7 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
       if (bash_connections[name]) return;
       bash_connections[name] = pty.spawn("docker", ["exec", "-it", name, "bash", "-i"]);
       bash_connections[name].stdout.on('data', function(data) {
-        emit('bash-data', {name: name, type: 'stdout', text: data.toString()});
-      });
-      bash_connections[name].stderr.on('data', function(data) {
-        emit('bash-data', {name: name, type: 'stderr', text: data.toString()});
+        emit('docker.container.bash.data', {name: name, type: 'stdout', text: data.toString()});
       });
     }
 
