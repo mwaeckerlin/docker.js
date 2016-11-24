@@ -598,6 +598,7 @@ var Docker = function(socket, container_element, error) {
     .on("docker.fail", error)
     .on("docker.containers", sigcontainers)
     .on("docker.stats", stats);
+  emit("docker.containers");
 
 }
 
