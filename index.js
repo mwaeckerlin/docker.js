@@ -1,14 +1,13 @@
 module.exports = function(app, updateContainerInterval, updateStatsInterval) {
 
-  var connect = function(io, socket) {
+  var running="";
+  
+  this.connect = function(io, socket) {
 
     var pty = require('pty.js');
     var proc = require('child_process');
     var docker = require(__dirname+'/docker.js');
     
-    var module={};
-    var running="";
-
     function broadcast(signal, data) {
       console.log("<= signal: "+signal);
       io.sockets.emit(signal, data);
