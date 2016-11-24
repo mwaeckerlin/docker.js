@@ -244,7 +244,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     
     // serve jquery library
     app.get('/jquery.js', function(req, res) {
-      res.sendfile('jquery.js', {root: __dirname+'/../jquery/dist'});
+      res.sendfile('jquery.min.js', {root: __dirname});
     });
 
   }
