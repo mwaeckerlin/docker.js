@@ -516,7 +516,7 @@ var Docker = function(socket, container_element, error) {
   this.images = new this.Images();
   this.containers = new this.Containers();
 
-  this.rotate() {
+  this.rotate = function() {
     if (!viz) return;
     if (rankdir == "LR")
       rankdir = "TB";

@@ -229,9 +229,25 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
   }
 
   //==============================================================================
-  if (app) app.get('/docker/docker.js', function(req, res) {
-    res.sendfile('docker.js', {root: __dirname});
-  });
+
+  if (app) {
+
+    // serve client display library
+    app.get('/docker.js', function(req, res) {
+      res.sendfile('docker.js', {root: __dirname});
+    });
+    
+    // serve graphviz library
+    app.get('/viz.js', function(req, res) {
+      res.sendfile('viz.js', {root: __dirname+'/../viz.js'});
+    });
+    
+    // serve jquery library
+    app.get('/jquery.js', function(req, res) {
+      res.sendfile('jquery.js', {root: __dirname+'/../jquery/dist'});
+    });
+
+  }
   
   // Periodic Update of Images and Containers
   if (!updateContainerInterval) updateContainerInterval = 10000;
