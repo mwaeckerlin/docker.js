@@ -1,11 +1,11 @@
+var pty = require('pty.js');
+var proc = require('child_process');
 module.exports = function(app, updateContainerInterval, updateStatsInterval) {
 
   var running="";
   
   this.connect = function(io, socket) {
 
-    var pty = require('pty.js');
-    var proc = require('child_process');
     var docker = require(__dirname+'/docker.js');
     
     function broadcast(signal, data) {
@@ -40,31 +40,6 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
       oldcontainer = stdout;
     }
     
-    function containerlist(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("list docker containers failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      var containers = stdout.trim().replace(/\n/g, " ");
-      exec("docker inspect "+containers, containerinspect);
-    }
-    
-    function updatecontainers(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("update docker container failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      exec("docker ps -aq --no-trunc ", containerlist);
-    }
-
-    function stats(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("get containers stats failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      broadcast("stats", stdout);
-    }
-    
     var oldimage = null;
     function imageinspect(error, stdout, stderr) {
       if (error || stderr)
@@ -74,23 +49,6 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
       if (oldimage && oldimage==stdout) return; // do not resend same images
       oldimage = stdout;
       broadcast("images", stdout);
-    }
-
-    function imagelist(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("list docker images failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      exec("docker inspect "+stdout.trim().replace(/\n/g, " "),
-           imageinspect);
-    }
-
-    function updateimages(error, stdout, stderr) {
-      if (error || stderr)
-        return fail("update docker images failed", {
-          error: error, stderr: stderr, stdout: stdout
-        });
-      exec("docker images -q --no-trunc", imagelist);
     }
 
     function emit(signal, data, info) {
@@ -227,6 +185,48 @@ module.exports = function(app, updateContainerInterval, updateStatsInterval) {
       .on('docker.bash.input', bash_input)
       .on('docker.bash.end', bash_end);
 
+  }
+
+  function imagelist(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("list docker images failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    exec("docker inspect "+stdout.trim().replace(/\n/g, " "),
+         imageinspect);
+  }
+
+  function updateimages(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("update docker images failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    exec("docker images -q --no-trunc", imagelist);
+  }
+  
+  function containerlist(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("list docker containers failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    var containers = stdout.trim().replace(/\n/g, " ");
+    exec("docker inspect "+containers, containerinspect);
+  }
+  
+  function updatecontainers(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("update docker container failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    exec("docker ps -aq --no-trunc ", containerlist);
+  }
+
+  function stats(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("get containers stats failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    broadcast("stats", stdout);
   }
 
   //==============================================================================
