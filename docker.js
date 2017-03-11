@@ -184,7 +184,7 @@ var Docker = function(socket, container_element, error) {
       res += '"'+n.name+'"'
             +' [label="'+label
             +'",URL="#'+n.name
-            +'",fillcolor='+(n.status?n.status.color+',style=filled':'red,shape=octagon,style=filled')+"];\n";
+            +'",fillcolor='+(n.status?n.status.color+',style=striped':'red,shape=octagon,style=filled')+"];\n";
       if (n.ports) n.ports.forEach(function(p) {
         res += '"'+(p.ip?p.ip+":":"")+p.external+'" -> "'+n.name
               +'" [label="'+p.internal+'"];\n';
@@ -192,6 +192,7 @@ var Docker = function(socket, container_element, error) {
       if (n.links) n.links.forEach(function(l) {
         res += '"'+n.name+'" -> "'+l.container+'" [label="link: '+l.name+'"];\n'
       });
+      console.log('graphNode', res, n, omnistats);
       return res;
     }
     function graphVolumesInside(n) {
