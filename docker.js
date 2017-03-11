@@ -104,7 +104,7 @@ var Docker = function(socket, container_element, error) {
         bash: false
       },
       Terminated: {
-        color: "yellow2",
+        color: "darkorange",
         action1: "start",
         action2: "remove",
         bash: false
@@ -123,7 +123,7 @@ var Docker = function(socket, container_element, error) {
         bash: false
       },
       Running:    {
-        color: "lightgreen",
+        color: "springgreen",
         action1: "pause",
         action2: "stop",
         bash: true
@@ -192,7 +192,6 @@ var Docker = function(socket, container_element, error) {
       if (n.links) n.links.forEach(function(l) {
         res += '"'+n.name+'" -> "'+l.container+'" [label="link: '+l.name+'"];\n'
       });
-      console.log('graphNode', res, n, omnistats);
       return res;
     }
     function graphVolumesInside(n) {

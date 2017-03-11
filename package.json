@@ -1,6 +1,6 @@
 {
   "name": "docker.js",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "NodeJS Module for Handling and Displaying Docker Information",
   "main": "index.js",
   "scripts": {
