@@ -184,7 +184,7 @@ var Docker = function(socket, container_element, error) {
       res += '"'+n.name+'"'
             +' [label="'+label
             +'",URL="#'+n.name
-            +'",fillcolor='+(n.status?n.status.color+',style=striped':'red,shape=octagon,style=filled')+"];\n";
+            +'",fillcolor='+(n.status?n.status.color:'red,shape=octagon')+',style=filled];'+"\n";
       if (n.ports) n.ports.forEach(function(p) {
         res += '"'+(p.ip?p.ip+":":"")+p.external+'" -> "'+n.name
               +'" [label="'+p.internal+'"];\n';
