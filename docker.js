@@ -180,7 +180,7 @@ var Docker = function(socket, container_element, error) {
       return res;
     }
     function graphNode(n) {
-      var res = 'subgraph cluster'+n.name.replace(/[^a-zA-Z0-9]/, '_')+' {\n';
+      var res = 'subgraph cluster'+n.name.replace(/[^a-zA-Z0-9]/g, '_')+' {\n';
       var label = '<FONT point-size="10">'
                  +(n.image?n.image.name:'UNDEFINED')
                  +'</FONT><BR/><FONT point-size="18"><B>'
