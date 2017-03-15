@@ -156,7 +156,8 @@ var Docker = function(socket, container_element, error) {
       });
     }
     function graphIpClusters(ips) {
-      var res = "newrank=true;\n";
+      //var res = "newrank=true;\n";
+      var res = ''
       var i = 0;
       for (ip in ips) {
         res += "subgraph clusterIp"+(++i)+' {\nlabel="'+ip+'";\n';
@@ -167,6 +168,7 @@ var Docker = function(socket, container_element, error) {
         });
         res+="}\n";
       }
+      /*
       res += "{rank=same;\n";
       for (ip in ips) {
         ips[ip].forEach(function(p) {
@@ -174,30 +176,34 @@ var Docker = function(socket, container_element, error) {
         });
       }
       res+="}\n";
+      */
       return res;
     }
-    function graphNode(n, omitstats) {
-      var res = "";
-      var label = (n.image?n.image.name:'UNDEFINED')+'\\n'
-                 +(n.name?n.name:"UNKNOWN")
-                 +(omitstats?'':'\\n                       \\n                                   ');
+    function graphNode(n) {
+      var res = 'subgraph cluster'+n.name.replace(/[^a-zA-Z0-9]/, '_')+' {\n';
+      var label = '<FONT point-size="10">'
+                 +(n.image?n.image.name:'UNDEFINED')
+                 +'</FONT><BR/><FONT point-size="18"><B>'
+                 +(n.name?n.name:"UNKNOWN")+'</B></FONT>'
       res += '"'+n.name+'"'
-            +' [label="'+label
-            +'",URL="#'+n.name
+            +' [label=<'+label
+            +'>,URL="#'+n.name
             +'",fillcolor='+(n.status?n.status.color:'red,shape=octagon')+',style=filled];'+"\n";
       if (n.ports) n.ports.forEach(function(p) {
         res += '"'+(p.ip?p.ip+":":"")+p.external+'" -> "'+n.name
-              +'" [label="'+p.internal+'"];\n';
+              +'" [label="'+p.internal+'",style=dashed];\n';
       });
+      res+=graphVolumesInside(n)
+      res+='}\n'
       if (n.links) n.links.forEach(function(l) {
-        res += '"'+n.name+'" -> "'+l.container+'" [label="link: '+l.name+'"];\n'
-      });
-      return res;
+        res += '"'+n.name+'" -> "'+l.container+'" [label="'+l.name+'",style=dashed];\n'
+      })
+      return res
     }
     function graphVolumesInside(n) {
       var res = "";
       if (n.volumes) n.volumes.forEach(function(v) {
-        res += '"'+v.id+v.inside+'" [label="'+v.inside+'",shape=box];\n';
+        res += '"'+v.id+'" [label="'+v.inside+'",shape=none,margin=0,width=0,height=0];\n';
       });
       return res;
     }
@@ -205,7 +211,7 @@ var Docker = function(socket, container_element, error) {
       var res = "";
       if (n.volumes) n.volumes.forEach(function(v) {
         if (v.host)
-          res += '"'+v.outside+'" [label="'+v.host+'",shape=box];\n';
+          res += '"'+v.outside+'" [label="'+v.outside+'",shape=box];\n';
       });
       return res;
     }
@@ -213,27 +219,29 @@ var Docker = function(socket, container_element, error) {
       var res = "";
       if (n.volumes) n.volumes.forEach(function(v) {
         if (v.host)
-          res += '"'+v.id+v.inside+'" -> "'+v.outside+'" [label="mounted from"]\n';
-        res += '"'+n.name+'" -> "'+v.id+v.inside+'" [label="volume/'+v.rw+'"]\n';
+          res += '"'+v.id+'" -> "'+v.outside+'" [label="'+v.rw+'"]\n';
+        //res += '"'+n.name+'" -> "'+v.id+'" [label="volume/'+v.rw+'"]\n';
       });
       if (n.volumesfrom) n.volumesfrom.forEach(function(o) {
-        res += '"'+n.name+'" -> "'+nodes[o].name+'" [label="volumes from"]\n';
+        res += '"'+n.name+'" -> "'+nodes[o].name+'"\n';
       });
       return res;
     }
-    this.graph = function(n, omitstats) {
+    this.graph = function(n) {
       var res = "";
       var ips = [];
       n = n || nodes;
       for (name in n) getIps(n[name], ips);
       res += graphIpClusters(ips);
-      for (name in n) res += graphNode(n[name], omitstats);
-      res += "{rank=same;\n";
-      for (name in n) res += graphVolumesInside(n[name]);
-      res+="}\n";
-      res += "{rank=same;\n";
+      res += 'subgraph clusterAllNodes {style=invis;\n'
+      for (name in n) res += graphNode(n[name]);
+      //res += "{rank=same;\n";
+      //for (name in n) res += graphVolumesInside(n[name]);
+      //res+="}\n";
+      res += 'subgraph clusterAllVolumesOutside {\n';
       for (name in n) res += graphVolumesOutside(n[name]);
-      res+="}\n";
+      res += '}\n';
+      res += '}\n'
       for (name in n) res += graphVolumesConnections(n[name], n);
       return res;
     }
@@ -259,7 +267,7 @@ var Docker = function(socket, container_element, error) {
       return ns;
     }
     this.subgraph = function(name, nodes) {
-      return this.graph(this.subnet(name, nodes), nodes);
+      return this.graph(this.subnet(name, nodes));
     }
     this.configuration = function(name) {
       var ns = name;
@@ -283,7 +291,7 @@ var Docker = function(socket, container_element, error) {
         ns[n].volumes.forEach(function(v) {
           if (v.host) instance.volumes.push({
             inside: v.inside,
-            outside: v.host
+            outside: v.outside
           });
         });
         _docker.images.cleanup(ns[n].image.id, instance);
@@ -373,27 +381,27 @@ var Docker = function(socket, container_element, error) {
         else if (c.State.ExitCode == 0) nodes[name].status = _containers.Status.Terminated;
         else nodes[name].status = _containers.Status.Error;
         nodes[name].volumes = [];
-        var volumes = c.Volumes || c.Config.Volumes;
-        nodes[name].volumes = [];
-        if (volumes)
-          for (var volume in volumes) {
-            var rw = "rw";
-            var outside = (typeof volumes[volume]=="string")?volumes[volume]:null;
+        var volumes = [].concat(c.Volumes || c.Config.Volumes || [],
+                                c.HostConfig.Binds || []);
+        if (volumes) volumes.forEach(function(vol) {
+          var vs = []
+          if (typeof vol === 'string')
+            vs = [ vol.split(':')[1] ];
+          else if (typeof vol === 'object')
+            vs = Object.keys(vol);
+          vs.forEach(function(v) {
             if (c.Mounts) c.Mounts.forEach(function(mnt) {
-              if (mnt.Destination==volume) {
-                outside = mnt.Source;
-                rw = mnt.RW ? "rw" : "ro";
-              }
-            });
-            nodes[name].volumes.push({
-              id: volume+':'+(outside?outside:name),
-              rw:rw,
-              inside: volume,
-              outside: outside,
-              host: outside && !outside.match(/^\/var\/lib\/docker/)
-            ? outside : null
-            });
-          }
+              if (mnt.Destination==v)
+                nodes[name].volumes.push({
+                  id: mnt.Source+':'+mnt.Destination,
+                  rw: mnt.RW ? "rw" : "ro",
+                  inside: mnt.Destination,
+                  outside: mnt.Source,
+                  host: !mnt.Driver || mnt.Driver!='local'
+                })
+            })
+          })
+        })
         nodes[name].volumesfrom = [];
         if (!nodes[name].volumesto) nodes[name].volumesto = [];
         if (c.HostConfig.VolumesFrom) c.HostConfig.VolumesFrom.forEach(function(id) {
@@ -534,19 +542,19 @@ var Docker = function(socket, container_element, error) {
       viz = vizpath;
       vizmore = more;
     }
-    res = "digraph {\n"+"  rankdir="+rankdir+";\n"+viz+"\n}";
+    res = "digraph {\n"
+         +"rankdir="+rankdir+";\n"
+         +'nodesep=0.02;\n'
+         +viz
+         +"\n}";
     try {
       $(container_element).html(more?Viz(res)+more:Viz(res));
-      stats();
-      $(container_element+' a > ellipse + text').attr('font-size', '12');
-      $(container_element+' a > ellipse + text + text')
-        .attr('font-weight', 'bold')
-        .attr('font-size', '16')
-        .each(function() {$(this).attr('y', parseFloat($(this).attr('y'))+1.0)});
-      $(container_element+' a > ellipse + text + text + text, #main a > ellipse + text + text + text + text').attr('font-size', '10');
+      //$(container_element).html('<pre>'+res.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')+'</pre>');
+      $("svg g a").attr('xlink:title', '');
+      stats()
       docker.containers.contextmenu(container_element);
     } catch(e) {
-      (res = res.split("\n")).forEach(function(v, i, a) {
+      (res = res.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').split("\n")).forEach(function(v, i, a) {
         a[i] = ("000"+(i+1)).slice(-3)+": "+v;
       });
       $(container_element).html("<h2>Exception Caught:</h2><p>"+e+"<p><pre>"+res.join("\n")+"</pre>");
@@ -586,11 +594,21 @@ var Docker = function(socket, container_element, error) {
     lines.forEach(function(line) {
       if (!line) return;
       elements = line.split(/ +/);
+      $('#main title:contains("'+elements[0]+'")')
+        .filter(function() {return $(this).text() === elements[0]})
+        .next().children('a')
+        .attr('xlink:title',
+              'cpu: '+elements[1]+'\n'
+             +'mem: '+elements[7]+'\n'
+             +'net: '+elements[8]+elements[9]+' '+elements[11]+elements[12]+'\n'
+             +'block: '+elements[13]+elements[14]+' '+elements[16]+elements[17])
+      /*
       $('#main text + text:contains("'+elements[0]+'") + text + text')
         .html('cpu: '+elements[1]+' mem: '+elements[7]);
       $('#main text + text:contains("'+elements[0]+'") + text')
         .html('net: '+elements[8]+elements[9]+' '+elements[11]+elements[12]
              +' block: '+elements[13]+elements[14]+' '+elements[16]+elements[17]);
+      */
     });
   }
 

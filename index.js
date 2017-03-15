@@ -232,6 +232,8 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
 
   if (app) {
 
+    var path = require('path')
+
     // serve client display library
     app.get('/docker.js', function(req, res) {
       res.sendfile('docker.js', {root: __dirname});
@@ -239,12 +241,12 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     
     // serve graphviz library
     app.get('/viz.js', function(req, res) {
-      res.sendfile('viz.js', {root: __dirname+'/../viz.js'});
+      res.sendfile('viz.js', {root: path.dirname(require.resolve('viz.js'))});
     });
     
     // serve jquery library
     app.get('/jquery.js', function(req, res) {
-      res.sendfile('jquery.min.js', {root: __dirname+'/../jquery/dist'});
+      res.sendfile('jquery.min.js', {root: path.dirname(require.resolve('jquery'))});
     });
 
   }
