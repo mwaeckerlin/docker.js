@@ -34,7 +34,25 @@ var Docker = function(socket, container_element, error) {
   }
   
   var _docker = this;
+  
+  this.Nodes = function() {
 
+    var _nodes = this;
+    var nodes = [];
+
+    function setup() {
+      console.log('nodes', nodes)
+    }
+
+    this.set = function(c) {
+      if (typeof c == "string") c = JSON.parse(c);
+      if (typeof c != "array") throw "wrong format: "+(typeof c);
+      nodes = c;
+      setup();
+    }
+    
+  }
+  
   this.Images = function() {
 
     var _images = this;
@@ -443,7 +461,7 @@ var Docker = function(socket, container_element, error) {
       }
     }
     this.contextmenu = function(selector) {
-      $('a[xlink\\:href^=#]').click(function(e) {
+      $('a[xlink\\:href^="#"]').click(function(e) {
         var name = $(this).attr("xlink:href").replace(/^#/, "");
         var n = nodes[name];
         $(selector).prepend('<div id="popup"></div>')
@@ -524,6 +542,7 @@ var Docker = function(socket, container_element, error) {
 
   this.images = new this.Images();
   this.containers = new this.Containers();
+  this.nodes = new this.Nodes();
 
   this.rotate = function() {
     if (!viz) return;
@@ -582,6 +601,11 @@ var Docker = function(socket, container_element, error) {
       overview();
   }
   
+  function signodes(c) {
+    console.log("->rcv nodes");
+    docker.nodes.set(c);
+  }
+  
   var laststats=null;
   function stats(data) {
     if (data)
@@ -615,6 +639,7 @@ var Docker = function(socket, container_element, error) {
   socket
     .on("docker.fail", error)
     .on("docker.containers", sigcontainers)
+    .on("docker.nodes", signodes)
     .on("docker.stats", stats);
   emit("docker.containers");
 

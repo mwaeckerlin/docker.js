@@ -1,7 +1,7 @@
 {
   "name": "docker.js",
-  "version": "1.0.1",
-  "description": "NodeJS Module for Handling and Displaying Docker Information",
+  "version": "1.1.0",
+  "description": "NodeJS Module for Handling and Displaying Docker Information, updating to support swarm",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

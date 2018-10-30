@@ -13,11 +13,14 @@ This library will used in the project [Docker as a Service](https://servicedock.
 Code snipped from usage on server side:
 
 ```javascript
-var express = require('express');
-var app = express.createServer();
-var io = require('socket.io').listen(app);
-var docker = require('docker.js')(app, io);
-io.sockets.on('connection', docker.connect(socket));
+var express = require('express')
+var app = express()
+var server = app.listen(3000, () => {
+  // listening on port 3000
+})
+var io = require('socket.io').listen(server)
+var docker = require('docker.js')(app, io)
+io.sockets.on('connection', docker.connect)
 ```
 
 ## Client Side
@@ -38,14 +41,14 @@ Code snipped from usage on client side:
 </html>
 ```
 ```javascript
-var socket = null;
-var docker = null;
+var socket = null
+var docker = null
 function error(msg) {
   // handle display errors
 }
 function init() {
-  socket = io.connect();
-  docker = new Docker(socket, '#main', error);
+  socket = io.connect()
+  docker = new Docker(socket, '#main', error)
 }
-$(init);
+$(init)
 ```

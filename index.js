@@ -162,20 +162,32 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     console.log("** "+txt, data);
   }
 
-  var oldcontainer = null;
-  function containerinspect(error, stdout, stderr) {
+  var oldnode = null;
+  function nodeinspect(error, stdout, stderr) {
     if (error || stderr)
-      return fail("inspect docker containers failed", {
+      return fail("inspect docker nodes failed", {
         error: error, stderr: stderr, stdout: stdout
       });
-    running = "";
-    JSON.parse(stdout).forEach(function(n) {
-      if (n.State.Running) running+=" "+n.Name.replace(/^\//, '');
-    });
-    if (oldcontainer!=stdout) broadcast("docker.containers", stdout);
-    oldcontainer = stdout;
+    if (oldnode!=stdout) broadcast("docker.nodes", stdout);
+    oldnode = stdout;
   }
   
+  function nodelist(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("list docker nodes failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    exec("docker node inspect "+stdout.trim().replace(/\n/g, " "), nodeinspect);
+  }
+
+  function updatenodes(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("update docker nodes failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    exec("docker node ls -q", nodelist);
+  }
+
   var oldimage = null;
   function imageinspect(error, stdout, stderr) {
     if (error || stderr)
@@ -201,6 +213,20 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
         error: error, stderr: stderr, stdout: stdout
       });
     exec("docker images -q --no-trunc", imagelist);
+  }
+  
+  var oldcontainer = null;
+  function containerinspect(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("inspect docker containers failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    running = "";
+    JSON.parse(stdout).forEach(function(n) {
+      if (n.State.Running) running+=" "+n.Name.replace(/^\//, '');
+    });
+    if (oldcontainer!=stdout) broadcast("docker.containers", stdout);
+    oldcontainer = stdout;
   }
   
   function containerlist(error, stdout, stderr) {
@@ -256,6 +282,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
   setInterval(function() {
     updateimages();
     updatecontainers();
+    updatenodes();
   }, updateContainerInterval);
 
   // Periodic Update of Stats
