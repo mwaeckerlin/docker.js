@@ -200,7 +200,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
       cmd += 'docker stack ps --format \'{"id":{{json .ID}},"name":{{json .Name}},"image":{{json .Image}},"node":{{json .Node}},"state":{"desired":{{json .DesiredState}},"current":{{json .CurrentState}}},"error":{{json .Error}},"ports":{{json .Ports}}},\' '+name+'; '
       cmd += 'echo -n \'],"services":[\'; '
       cmd += 'docker stack services --format \'{"id":{{json .ID}},"name":{{json .Name}},"mode":{{json .Mode}},"replicas":{{json .Replicas}},"image":{{json .Image}},"ports":{{json .Ports}}},\' '+name+'; '
-      cmd += 'echo -n "]}";'
+      cmd += 'echo -n "]},";'
     })
     cmd += 'echo -n \']\'; '
     //console.log(cmd.replace(/; /g, ";\n"))
