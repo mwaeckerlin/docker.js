@@ -1,10 +1,23 @@
-var Docker = function(socket, container_element, error) {
+var Docker = function(socket, error, container_element, nodes_element, stacks_element) {
 
   var focused = null;
   var viz = null;
   var vizmore = null;
   var rankdir = "LR";
   var docker = this;
+
+  function nicebytes(bytes) {
+    var val = bytes
+    if (val<1024) return (Math.round(val*100)/100)+" B";
+    val /= 1024
+    if (val<1024) return (Math.round(val*100)/100)+" kB";
+    val /= 1024
+    if (val<1024) return (Math.round(val*100)/100)+" MB";
+    val /= 1024
+    if (val<1024) return (Math.round(val*100)/100)+" GB";
+    val /= 1024
+    return (Math.round(val*100)/100)+" TB";
+  }
 
   function emit(signal, data) {
     console.log("<-snd "+signal, data);
@@ -35,24 +48,201 @@ var Docker = function(socket, container_element, error) {
   
   var _docker = this;
   
+  
   this.Nodes = function() {
 
     var _nodes = this;
     var nodes = [];
 
-    function setup() {
-      console.log('nodes', nodes)
+    this.show = function() {
+      if (!nodes_element) return;
+      $(nodes_element).empty()
+      nodes.forEach((n) => {
+        var color = 'grey'
+        switch (n.Spec.Availability) {
+          case "active":
+            color = 'green'
+            break
+        }
+        $(nodes_element).append(
+          '<table style="background-color: '+color+'">'
+         +'<thead>'
+         +'<tr><td>'+n.Description.Hostname+'</td></tr>'
+         +'</thead>'
+         +'<tbody>'
+         +'<tr><td>'+n.Spec.Role+'</td></tr>'
+         +'<tr><td>'+n.Description.Platform.Architecture+'</td></tr>'
+         +'<tr><td>'+n.Description.Platform.OS+'</td></tr>'
+         +'</tbody>'
+         +'</table>')
+      })
+    }
+
+    this.get = function() {
+      return nodes
     }
 
     this.set = function(c) {
       if (typeof c == "string") c = JSON.parse(c);
-      if (typeof c != "array") throw "wrong format: "+(typeof c);
+      if (typeof c != "object") throw "wrong format: "+(typeof c);
       nodes = c;
-      setup();
     }
     
   }
   
+  this.Stacks = function() {
+
+    var _stacks = this
+    var stacks = []
+    
+    this.show = function() {
+      if (!stacks_element) return;
+      var res = "digraph {\n"
+               +"  subgraph clusterPorts {\n"
+               +"    label=\"Ports\";\n"
+               +(() => {
+                 var res = ""
+                 stacks.forEach((s) => {
+                   s.services.forEach((s) => {
+                     if (s.ports) {
+                       res += "    \""+s.ports.replace(/->.*/, '')+"\";\n"
+                     }
+                   })
+                 })
+                 return res
+               })()
+               +"  }\n"
+               +"  subgraph clusterServices {\n"
+               +"    label=\"Services\";\n"
+               +"    style=filled;\n"
+               +"    fillcolor=grey;\n"
+               +(() => {
+                 var res = ""
+                 var i = 0
+                 stacks.forEach((st) => {
+                   var error = 0
+                   res += "    subgraph clusterService"+(++i)+" {\n"
+                         +"      label=< <B>"+st.name+"</B> >;\n"
+                         +"      node [style=filled];\n"
+                   st.services.forEach((s) => {
+                     var localerror = 0
+                     if (s.mode=='replicated') {
+                       rep = s.replicas.split('/')
+                       if (rep.length==2) {
+                         if (rep[0]==0) {
+                           localerror = 2
+                           error = 2
+                         } else if (rep[0]<rep[1]) {
+                           localerror = 1
+                           if (error<1) {
+                             error = 1
+                           }
+                         }
+                       }
+                     }
+                     res += '      "'+s.id+'" [label=< <FONT POINT-SIZE="10">'
+                           +s.image+'</FONT><BR/><B>'
+                           +s.name.replace(st.name+'_', '')
+                           +"</B> >,fillcolor="+(localerror==0
+                                                ?"springgreen"
+                                                :(localerror==1
+                                                 ?"darkorange"
+                                                 :"indianred1"))+"];\n"
+                     if (s.ports) {
+                       res += "      \""+s.id+"\" -> \""
+                             +s.ports.replace(/->.*/, '')
+                             +"\" [label=\""
+                             +s.ports.replace(/.*->/, '')+"\"];\n"
+                     }
+                   })
+                   res += "      fillcolor="
+                         +(error==0
+                          ?"springgreen3"
+                          :(error==1
+                           ?"darkorange3"
+                           :"indianred3"))+";\n"
+                         +"    }\n"
+                 })
+                 return res
+               })()
+               +"  }\n"
+               +"  subgraph clusterNodes {\n"
+               +"    label=\"Nodes\";\n"
+               +"    style=filled;\n"
+               +"    fillcolor=grey;\n"
+               +(() => {
+                 var res = ""
+                 nodes = _docker.nodes.get()
+                 if (!nodes) return res;
+                 nodes.forEach((node) => {
+                   res += "    subgraph clusterNode"+node.ID+" {\n"
+                         +"      label=< <B>"+node.Description.Hostname+"</B> >;\n"
+                         +"      node [style=filled];\n"
+                         +"      fillcolor="
+                         +((node.Status.State!='ready'||node.ManagerStatus.Reachability!='reachable')
+                          ?'indianred3'
+                          :(node.Spec.Availability=='active'
+                           ?'springgreen3'
+                           :'darkorange3'))+";\n"
+                         +"      "+node.ID+" [fillcolor="+(node.Spec.Role!="manager"
+                                                          ?"aqua"
+                                                          :(node.ManagerStatus.Leader
+                                                           ?"greenyellow"
+                                                           :"palegreen"))+";shape=none;label=< "
+                         +"<TABLE>"
+                         +"<TR><TD>Platform:</TD><TD>"+node.Description.Platform.OS+" "+node.Description.Platform.Architecture+"</TD></TR>"
+                         +"<TR><TD>Engine:</TD><TD>"+node.Description.Engine.EngineVersion+"</TD></TR>"
+                         +"<TR><TD>CPUs:</TD><TD>"+(node.Description.Resources.NanoCPUs/1000000000)+"</TD></TR>"
+                         +"<TR><TD>Memory:</TD><TD>"+nicebytes(node.Description.Resources.MemoryBytes)+"</TD></TR>"
+                         +"<TR><TD>Addr:</TD><TD>"+node.Status.Addr+"</TD></TR>"
+                         +"</TABLE> >];\n"
+                         +(() => {
+                           var res = ""
+                           stacks.forEach((st) => {
+                             st.processes.forEach((p) => {
+                               if (p.state.desired!="Running" || node.Description.Hostname!=p.node) return;
+                               res += "      \""+p.id+"\" [fillcolor="+(p.state.current.match(/^Running/)
+                                                                       ?"springgreen"
+                                                                       :"indianred1")
+                                     +',label=< <FONT POINT-SIZE="10">'
+                                     +p.image+'</FONT><BR/><B>'
+                                     +p.name.replace(st.name+'_', '')
+                                     +"</B> >];\n"
+                                     +"      \""+st.services.find((e) => {
+                                       var re = new RegExp(e.name)
+                                       return p.name.match(re)
+                                     }).id+"\" -> \""+p.id+"\";\n"
+                             })
+                           })
+                           return res
+                         })()
+                         +"    }\n"
+                 })
+                 return res
+               })()
+               +"  }\n"
+               +"}"
+      try {
+        $(stacks_element).html(Viz(res))
+        //$("svg g a").attr('xlink:title', '');
+      } catch(e) {
+        (res = res.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').split("\n")).forEach(function(v, i, a) {
+          a[i] = ("000"+(i+1)).slice(-3)+": "+v;
+        });
+        $(stacks_element).html("<h2>Exception Caught:</h2><p>"+e+"<p><pre>"+res.join("\n")+"</pre>");
+        throw e;
+      }
+    }
+
+    this.set = function(c) {
+      if (typeof c == "string") c = JSON.parse(c);
+      if (typeof c != "object") throw "wrong format: "+(typeof c);
+      console.log(c)
+      stacks = c;
+    }
+    
+  }
+
   this.Images = function() {
 
     var _images = this;
@@ -543,6 +733,7 @@ var Docker = function(socket, container_element, error) {
   this.images = new this.Images();
   this.containers = new this.Containers();
   this.nodes = new this.Nodes();
+  this.stacks = new this.Stacks();
 
   this.rotate = function() {
     if (!viz) return;
@@ -554,6 +745,7 @@ var Docker = function(socket, container_element, error) {
   }
 
   this.show = function(vizpath, more) {
+    if (!container_element) return;
     if (!vizpath) {
       vizpath = viz;
       more = vizmore;
@@ -603,7 +795,14 @@ var Docker = function(socket, container_element, error) {
   
   function signodes(c) {
     console.log("->rcv nodes");
-    docker.nodes.set(c);
+    docker.nodes.set(c)
+    docker.nodes.show()
+  }
+  
+  function sigstacks(c) {
+    console.log("->rcv stacks");
+    docker.stacks.set(c)
+    docker.stacks.show()
   }
   
   var laststats=null;
@@ -618,7 +817,7 @@ var Docker = function(socket, container_element, error) {
     lines.forEach(function(line) {
       if (!line) return;
       elements = line.split(/ +/);
-      $('#main title:contains("'+elements[0]+'")')
+      $(container_element+' title:contains("'+elements[0]+'")')
         .filter(function() {return $(this).text() === elements[0]})
         .next().children('a')
         .attr('xlink:title',
@@ -627,9 +826,9 @@ var Docker = function(socket, container_element, error) {
              +'net: '+elements[8]+elements[9]+' '+elements[11]+elements[12]+'\n'
              +'block: '+elements[13]+elements[14]+' '+elements[16]+elements[17])
       /*
-      $('#main text + text:contains("'+elements[0]+'") + text + text')
+         $(container_element+' text + text:contains("'+elements[0]+'") + text + text')
         .html('cpu: '+elements[1]+' mem: '+elements[7]);
-      $('#main text + text:contains("'+elements[0]+'") + text')
+         $(container_element+' text + text:contains("'+elements[0]+'") + text')
         .html('net: '+elements[8]+elements[9]+' '+elements[11]+elements[12]
              +' block: '+elements[13]+elements[14]+' '+elements[16]+elements[17]);
       */
@@ -640,8 +839,11 @@ var Docker = function(socket, container_element, error) {
     .on("docker.fail", error)
     .on("docker.containers", sigcontainers)
     .on("docker.nodes", signodes)
-    .on("docker.stats", stats);
-  emit("docker.containers");
+    .on("docker.stacks", sigstacks)
+    .on("docker.stats", stats)
+  emit("docker.containers")
+  emit("docker.nodes")
+  emit("docker.stacks")
 
 }
 

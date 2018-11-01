@@ -48,6 +48,18 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
       else updatecontainers();
     }
     
+    function nodes() {
+      console.log("-> nodes");
+      if (oldnode) emit("docker.nodes", oldnode);
+      else updatenodes();
+    }
+    
+    function stacks() {
+      console.log("-> stacks");
+      if (oldstack) emit("docker.stacks", oldstack);
+      else updatestacks();
+    }
+    
     function images() {
       console.log("-> images");
       if (oldimage) emit("docker.images", oldimage);
@@ -130,6 +142,8 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
 
     socket
       .on("docker.containers", containers)
+      .on("docker.nodes", nodes)
+      .on("docker.stacks", stacks)
       .on("docker.images", images)
       .on("docker.container.start", start)
       .on("docker.container.stop", stop)
@@ -160,6 +174,45 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
 
   function fail(txt, data) {
     console.log("** "+txt, data);
+  }
+
+  var oldstack = null;
+  function stackinspect(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("inspect docker stacks failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    stdout = stdout.replace(/\n/g, '').replace(/,\]/g, ']')
+    if (oldstack!=stdout)
+      broadcast("docker.stacks", stdout)
+    oldstack = stdout;
+  }
+  
+  function stacklist(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("list docker stacks failed", {
+        error: error, stderr: stderr, stdout: stdout
+      });
+    var stacks = stdout.trim().split("\n")
+    var cmd = 'echo -n \'[\'; '
+    stacks.forEach((name) => {
+      cmd += 'echo -n \'{"name":"'+name+'","processes":[\'; '
+      cmd += 'docker stack ps --format \'{"id":{{json .ID}},"name":{{json .Name}},"image":{{json .Image}},"node":{{json .Node}},"state":{"desired":{{json .DesiredState}},"current":{{json .CurrentState}}},"error":{{json .Error}},"ports":{{json .Ports}}},\' '+name+'; '
+      cmd += 'echo -n \'],"services":[\'; '
+      cmd += 'docker stack services --format \'{"id":{{json .ID}},"name":{{json .Name}},"mode":{{json .Mode}},"replicas":{{json .Replicas}},"image":{{json .Image}},"ports":{{json .Ports}}},\' '+name+'; '
+      cmd += 'echo -n "]}";'
+    })
+    cmd += 'echo -n \']\'; '
+    //console.log(cmd.replace(/; /g, ";\n"))
+    exec(cmd, stackinspect)
+  }
+
+  function updatestacks(error, stdout, stderr) {
+    if (error || stderr)
+      return fail("update docker stacks failed", {
+        error: error, stderr: stderr, stdout: stdout
+      })
+    exec('docker stack ls --format \'{{.Name}}\'', stacklist)
   }
 
   var oldnode = null;
@@ -276,21 +329,28 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     });
 
   }
+
+  function updateall() {
+    console.log('UPDATE:IMAGES')
+    updateimages()
+    console.log('UPDATE:CONTAINERS')
+    updatecontainers()
+    console.log('UPDATE:NODES')
+    updatestacks()
+    console.log('UPDATE:STACKS')
+    updatenodes()
+    console.log('UPDATE:done')
+  }
   
   // Periodic Update of Images and Containers
-  if (!updateContainerInterval) updateContainerInterval = 10000;
-  setInterval(function() {
-    updateimages();
-    updatecontainers();
-    updatenodes();
-  }, updateContainerInterval);
+  updateall()
+  setInterval(updateall, updateContainerInterval||5000)
 
   // Periodic Update of Stats
-  if (!updateStatsInterval) updateStatsInterval = 1000;
+  if (!updateStatsInterval) updateStatsInterval = 2000;
   setInterval(function() {
     if (running) exec('docker stats --no-stream'+running, stats);
   }, updateStatsInterval);
   
-  return this;
-  
+  return this;  
 }
