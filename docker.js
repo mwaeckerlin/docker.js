@@ -167,6 +167,8 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                  var res = ""
                  nodes = _docker.nodes.get()
                  if (!nodes) return res;
+                 res += "  subgraph clusterNodes {\n"
+                       +"    style=invis;\n"
                  nodes.forEach((node) => {
                    res += "    \""+node.ID+"\" [shape=box,label=<\n"
                          +"      <TABLE>"
@@ -214,15 +216,18 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                                   :(node.Spec.Availability=='active'
                                    ?'springgreen3'
                                    :'darkorange3'))+"];\n"
-                           // connect stacks with processes
-                           stacks.forEach((st) => {
-                             if (st.processes.find((p) => {
-                               return p.state.desired=="Running" && p.node==node.Description.Hostname
-                             }))
-                               res += "      \""+st.name+"\" -> \""+node.ID+"\":\""+st.name+"\";\n"
-                           })
                            return res
                          })()
+                 })
+                 res += "  }\n"
+                 // connect stacks with processes
+                 nodes.forEach((node) => {
+                   stacks.forEach((st) => {
+                     if (st.processes.find((p) => {
+                       return p.state.desired=="Running" && p.node==node.Description.Hostname
+                     }))
+                       res += "      \""+st.name+"\" -> \""+node.ID+"\":\""+st.name+"\";\n"
+                   })
                  })
                  return res
                })()
