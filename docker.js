@@ -172,7 +172,7 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                          +"      <TABLE>"
                          +"        <TR><TD BGCOLOR=\""
                          +(node.Spec.Role!="manager"
-                          ?"aqua"
+                          ?"turquoise1"
                           :(node.ManagerStatus&&node.ManagerStatus.Leader
                            ?"greenyellow"
                            :"palegreen"))
@@ -221,7 +221,6 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                            })
                            return res
                          })()
-                         +"    }\n"
                  })
                  return res
                })()
