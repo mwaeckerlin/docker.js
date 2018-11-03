@@ -99,7 +99,7 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
       if (!stacks_element) return;
       var res = "digraph {\n"
                +"  rankdir=LR;\n"
-               +"  ranksep=1;\n"
+               +"  ranksep=4;\n"
                +"  node [style=filled];\n"
       // ports
                +(()=> {
@@ -186,18 +186,24 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                          +(() => {
                            var res = ""
                            stacks.forEach((st) => {
-                             st.processes.forEach((p) => {
-                               if (p.state.desired!="Running" || node.Description.Hostname!=p.node) return;
+                             var first = true
+                             st.processes.filter((p) => {
+                               return p.state.desired=="Running" && node.Description.Hostname==p.node
+                             }).forEach((p, i, procs) => {
                                var color = "BGCOLOR=\""
                                           +(p.state.current.match(/^Running/)
                                            ?"springgreen"
                                            :"indianred1")
                                           +"\""
-                               res += "        <TR><TD PORT=\""+p.id
-                                     +"\" "+color+"><B>"
-                                     +p.name.replace(st.name+'_', '')
-                                     +"</B></TD><TD "+color+">"
-                                     +p.image+"</TD></TR>\n"
+                               res += "        <TR>"
+                               if (first)
+                                 res += "<TD ROWSPAN=\""+procs.length
+                                       +"\" PORT=\""+st.name+"\" "+color+"><B>"
+                                       +st.name
+                                       +"</B></TD>"
+                               res += "<TD "+color+">"
+                                     +p.name.replace(st.name+'_', '')+"</TD></TR>\n"
+                               first = false
                              })
                            })
                            res += "      </TABLE>\n"
@@ -210,14 +216,10 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                                    :'darkorange3'))+"];\n"
                            // connect stacks with processes
                            stacks.forEach((st) => {
-                             st.processes.forEach((p) => {
-                               if (p.state.desired!="Running" || node.Description.Hostname!=p.node) return;
-                               var s = st.services.find((e) => {
-                                 var re = new RegExp(e.name)
-                                 return p.name.match(re)
-                               })
-                               res += "      \""+st.name+"\":\"l"+s.id+"\" -> \""+node.ID+"\":\""+p.id+"\";\n"
-                             })
+                             if (st.processes.find((p) => {
+                               return p.state.desired=="Running" && p.node==node.Description.Hostname
+                             }))
+                               res += "      \""+st.name+"\" -> \""+node.ID+"\":\""+st.name+"\";\n"
                            })
                            return res
                          })()
