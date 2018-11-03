@@ -1,13 +1,16 @@
 module.exports = function(app, io, updateContainerInterval, updateStatsInterval) {
 
+  /// @todo change from exec to this
+  //const {Docker} = require('node-docker-api')
+  //const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+
   var running="";
   var proc = require('child_process');
   
   this.connect = function(socket) {
 
     var pty = require('pty.js');
-    var docker = require(__dirname+'/docker.js');
-    
+
     function emit(signal, data, info) {
       if (typeof data == 'string' && !data.match("\n")) {
         console.log("<- signal: "+signal+"("+data+")");

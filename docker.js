@@ -98,32 +98,34 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
     this.show = function() {
       if (!stacks_element) return;
       var res = "digraph {\n"
-               +"  subgraph clusterPorts {\n"
-               +"    label=\"Ports\";\n"
-               +(() => {
+               +"  rankdir=LR;\n"
+               +"  ranksep=1;\n"
+               +"  node [style=filled];\n"
+      // ports
+               +(()=> {
                  var res = ""
-                 stacks.forEach((s) => {
-                   s.services.forEach((s) => {
+                 stacks.forEach((st) => {
+                   st.services.forEach((s) => {
                      if (s.ports) {
-                       res += "    \""+s.ports.replace(/->.*/, '')+"\";\n"
+                       res += "      \""+s.ports.replace(/->.*/, '')+"\";\n"
+                             +"      \""+s.ports.replace(/->.*/, '')+"\" -> \""
+                             +st.name+"\":\""+s.id
+                             +"\" [label=\""
+                             +s.ports.replace(/.*->/, '')+"\"];\n"
                      }
                    })
                  })
                  return res
                })()
-               +"  }\n"
-               +"  subgraph clusterServices {\n"
-               +"    label=\"Services\";\n"
-               +"    style=filled;\n"
-               +"    fillcolor=grey;\n"
+      // stacks
                +(() => {
                  var res = ""
-                 var i = 0
                  stacks.forEach((st) => {
                    var error = 0
-                   res += "    subgraph clusterService"+(++i)+" {\n"
-                         +"      label=< <B>"+st.name+"</B> >;\n"
-                         +"      node [style=filled];\n"
+                   res += "    \""+st.name+"\" [shape=box,label=< \n"
+                         +"      <TABLE>\n"
+                         +"        <TR><TD COLSPAN=\"2\"><FONT POINT-SIZE=\"24\"><B>"+st.name+"</B></FONT></TD></TR>\n"
+                   // services in stacks
                    st.services.forEach((s) => {
                      var localerror = 0
                      if (s.mode=='replicated') {
@@ -140,78 +142,81 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                          }
                        }
                      }
-                     res += '      "'+s.id+'" [label=< <FONT POINT-SIZE="10">'
-                           +s.image+'</FONT><BR/><B>'
+                     var color = "BGCOLOR=\""+(localerror==0
+                                              ?"springgreen"
+                                              :(localerror==1
+                                               ?"darkorange"
+                                               :"indianred1"))
+                                +"\""
+                     res += "        <TR><TD PORT=\""+s.id+"\" "+color+"\>"
                            +s.name.replace(st.name+'_', '')
-                           +"</B> >,fillcolor="+(localerror==0
-                                                ?"springgreen"
-                                                :(localerror==1
-                                                 ?"darkorange"
-                                                 :"indianred1"))+"];\n"
-                     if (s.ports) {
-                       res += "      \""+s.id+"\" -> \""
-                             +s.ports.replace(/->.*/, '')
-                             +"\" [label=\""
-                             +s.ports.replace(/.*->/, '')+"\"];\n"
-                     }
+                           +"</TD><TD PORT=\"l"+s.id+"\" "+color+">"+s.image+"</TD></TR>\n"
                    })
-                   res += "      fillcolor="
+                   res += "      </TABLE>\n"
+                   res += "    >,fillcolor="
                          +(error==0
                           ?"springgreen3"
                           :(error==1
                            ?"darkorange3"
-                           :"indianred3"))+";\n"
-                         +"    }\n"
+                           :"indianred3"))+"];\n"
                  })
                  return res
                })()
-               +"  }\n"
-               +"  subgraph clusterNodes {\n"
-               +"    label=\"Nodes\";\n"
-               +"    style=filled;\n"
-               +"    fillcolor=grey;\n"
+      // nodes
                +(() => {
                  var res = ""
                  nodes = _docker.nodes.get()
                  if (!nodes) return res;
                  nodes.forEach((node) => {
-                   res += "    subgraph clusterNode"+node.ID+" {\n"
-                         +"      label=< <B>"+node.Description.Hostname+"</B> >;\n"
-                         +"      node [style=filled];\n"
-                         +"      fillcolor="
-                         +((node.Status.State!='ready'||node.ManagerStatus.Reachability!='reachable')
-                          ?'indianred3'
-                          :(node.Spec.Availability=='active'
-                           ?'springgreen3'
-                           :'darkorange3'))+";\n"
-                         +"      "+node.ID+" [fillcolor="+(node.Spec.Role!="manager"
-                                                          ?"aqua"
-                                                          :(node.ManagerStatus.Leader
-                                                           ?"greenyellow"
-                                                           :"palegreen"))+";shape=none;label=< "
-                         +"<TABLE>"
-                         +"<TR><TD>Platform:</TD><TD>"+node.Description.Platform.OS+" "+node.Description.Platform.Architecture+"</TD></TR>"
-                         +"<TR><TD>Engine:</TD><TD>"+node.Description.Engine.EngineVersion+"</TD></TR>"
-                         +"<TR><TD>CPUs:</TD><TD>"+(node.Description.Resources.NanoCPUs/1000000000)+"</TD></TR>"
-                         +"<TR><TD>Memory:</TD><TD>"+nicebytes(node.Description.Resources.MemoryBytes)+"</TD></TR>"
-                         +"<TR><TD>Addr:</TD><TD>"+node.Status.Addr+"</TD></TR>"
-                         +"</TABLE> >];\n"
+                   res += "    \""+node.ID+"\" [shape=box,label=<\n"
+                         +"      <TABLE>"
+                         +"        <TR><TD BGCOLOR=\""
+                         +(node.Spec.Role!="manager"
+                          ?"aqua"
+                          :(node.ManagerStatus&&node.ManagerStatus.Leader
+                           ?"greenyellow"
+                           :"palegreen"))
+                         +"\" COLSPAN=\"2\"><FONT POINT-SIZE=\"24\"><B>"+node.Description.Hostname+"</B></FONT></TD></TR>\n"
+                         +"        <TR><TD>Platform:</TD><TD>"+node.Description.Platform.OS+" "+node.Description.Platform.Architecture+"</TD></TR>\n"
+                         +"        <TR><TD>Engine:</TD><TD>"+node.Description.Engine.EngineVersion+"</TD></TR>\n"
+                         +"        <TR><TD>CPUs:</TD><TD>"+(node.Description.Resources.NanoCPUs/1000000000)+"</TD></TR>\n"
+                         +"        <TR><TD>Memory:</TD><TD>"+nicebytes(node.Description.Resources.MemoryBytes)+"</TD></TR>\n"
+                         +"        <TR><TD>Addr:</TD><TD>"+node.Status.Addr+"</TD></TR>\n"
+                   // processes
                          +(() => {
                            var res = ""
                            stacks.forEach((st) => {
                              st.processes.forEach((p) => {
                                if (p.state.desired!="Running" || node.Description.Hostname!=p.node) return;
-                               res += "      \""+p.id+"\" [fillcolor="+(p.state.current.match(/^Running/)
-                                                                       ?"springgreen"
-                                                                       :"indianred1")
-                                     +',label=< <FONT POINT-SIZE="10">'
-                                     +p.image+'</FONT><BR/><B>'
+                               var color = "BGCOLOR=\""
+                                          +(p.state.current.match(/^Running/)
+                                           ?"springgreen"
+                                           :"indianred1")
+                                          +"\""
+                               res += "        <TR><TD PORT=\""+p.id
+                                     +"\" "+color+"><B>"
                                      +p.name.replace(st.name+'_', '')
-                                     +"</B> >];\n"
-                                     +"      \""+st.services.find((e) => {
-                                       var re = new RegExp(e.name)
-                                       return p.name.match(re)
-                                     }).id+"\" -> \""+p.id+"\";\n"
+                                     +"</B></TD><TD "+color+">"
+                                     +p.image+"</TD></TR>\n"
+                             })
+                           })
+                           res += "      </TABLE>\n"
+                                 +"    >,fillcolor="
+                                 +((node.Status.State!='ready'||
+                                    (node.ManagerStatus&&node.ManagerStatus.Reachability)!='reachable')
+                                  ?'indianred3'
+                                  :(node.Spec.Availability=='active'
+                                   ?'springgreen3'
+                                   :'darkorange3'))+"];\n"
+                           // connect stacks with processes
+                           stacks.forEach((st) => {
+                             st.processes.forEach((p) => {
+                               if (p.state.desired!="Running" || node.Description.Hostname!=p.node) return;
+                               var s = st.services.find((e) => {
+                                 var re = new RegExp(e.name)
+                                 return p.name.match(re)
+                               })
+                               res += "      \""+st.name+"\":\"l"+s.id+"\" -> \""+node.ID+"\":\""+p.id+"\";\n"
                              })
                            })
                            return res
@@ -220,8 +225,8 @@ var Docker = function(socket, error, container_element, nodes_element, stacks_el
                  })
                  return res
                })()
-               +"  }\n"
                +"}"
+      console.log('GRAPHVIZ', res)
       try {
         $(stacks_element).html(Viz(res))
         //$("svg g a").attr('xlink:title', '');
