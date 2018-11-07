@@ -37,19 +37,56 @@ function Graphics() {
     })
     var res = "digraph {\n"
              +"  rankdir=LR;\n"
-             +"  ranksep=4;\n"
+             +"  ranksep=3;\n"
              +"  node [style=filled];\n"
     // ports
              +(()=> {
                var res = ""
                services.forEach((s) => {
+                 var firstport = null
+                 var lastport = null
+                 var firsttargetport = null
+                 var lasttargetport = null
+                 var protocol = null
                  if (s.Endpoint && s.Endpoint.Ports)
                    s.Endpoint.Ports.forEach((p) => {
-                     res += "      \""+p.PublishedPort+"\";\n"
-                           +"      \""+p.PublishedPort+"\" -> \""
-                           +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
-                           +"\" [label=\""+p.TargetPort+'/'+p.Protocol+"\"];\n"
+                     if (lastport) {
+                       if (protocol!=p.Protocol || p.PublishedPort>lastport+1) {
+                         if (firstport==lastport)
+                           res += "      \""+firstport+"\";\n"
+                                 +"      \""+firstport+"\" -> \""
+                                 +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                                 +"\" [label=\""+firsttargetport+'/'+protocol+"\"];\n"
+                         else
+                           res += "      \""+firstport+"-"+lastport+"\";\n"
+                                 +"      \""+firstport+"-"+lastport+"\" -> \""
+                                 +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                                 +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
+                         firstport = lastport = p.PublishedPort
+                         firsttargetport = lasttargetport = p.TargetPort
+                         protocol = p.Protocol
+                       } else {
+                         lastport = p.PublishedPort
+                         lasttargetport = p.TargetPort
+                       }
+                     } else {
+                       firstport = lastport = p.PublishedPort
+                       firsttargetport = lasttargetport = p.TargetPort
+                       protocol = p.Protocol
+                     }
                    })
+                 if (firstport) {
+                   if (firstport==lastport)
+                     res += "      \""+firstport+"\";\n"
+                           +"      \""+firstport+"\" -> \""
+                           +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                           +"\" [label=\""+firsttargetport+'/'+protocol+"\"];\n"
+                   else
+                     res += "      \""+firstport+"-"+lastport+"\";\n"
+                           +"      \""+firstport+"-"+lastport+"\" -> \""
+                           +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                           +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
+                 }
                })
                return res
              })()
@@ -58,6 +95,7 @@ function Graphics() {
                var res = ""
                stacks.forEach((st) => {
                  var error = 0
+                 var link = ""
                  res += "    \""+st+"\" [shape=box,label=< \n"
                        +"      <TABLE>\n"
                        +"        <TR><TD COLSPAN=\"4\"><FONT POINT-SIZE=\"24\"><B>"+st+"</B></FONT></TD></TR>\n"
@@ -66,6 +104,8 @@ function Graphics() {
                    return st == s.Spec.Labels['com.docker.stack.namespace']
                  }).forEach((s) => {
                    var localerror = 0
+                   if ((new Date())-(new Date(s.UpdatedAt))<3600000)
+                     localerror = 1
                    if (s.Spec.Mode.Replicated) {
                      if (s.Spec.Mode.Replicated.Replicas<0) {
                        localerror = 2
@@ -73,14 +113,16 @@ function Graphics() {
                      }
                    }
                    var color = "BGCOLOR=\""+(localerror==0
-                                            ?"springgreen"
+                                            ?"springgreen3"
                                             :(localerror==1
-                                             ?"darkorange"
+                                             ?"springgreen"
                                              :"indianred1"))
                               +"\""
+                   if (s.Spec.TaskTemplate.ContainerSpec.Labels['url'])
+                     link = ",href=\""+s.Spec.TaskTemplate.ContainerSpec.Labels['url']+"\""
                    res += "        <TR><TD PORT=\""+s.ID+"\" "+color+"\>"
                          +s.Spec.Name.replace(st+'_', '')
-                         +"</TD><TD "+color+">"+s.Spec.TaskTemplate.ContainerSpec.Image.replace(/@.*$/, '')
+                         +"</TD><TD "+color+">"+s.Spec.TaskTemplate.ContainerSpec.Image.replace(/@.*$/, '').replace(/:latest$/, '')
                          +"</TD><TD "+color+">"+datediff(new Date(s.UpdatedAt))
                          +"</TD><TD PORT=\"l"+s.ID+"\" "+color+">"+(s.Spec.Mode.Replicated?s.Spec.Mode.Replicated.Replicas:"")+"</TD></TR>\n"
                  })
@@ -90,7 +132,9 @@ function Graphics() {
                         ?"springgreen3"
                         :(error==1
                          ?"darkorange3"
-                         :"indianred3"))+"];\n"
+                         :"indianred3"))
+                       +link
+                       +"];\n"
                })
                return res
              })()
@@ -124,18 +168,22 @@ function Graphics() {
                              return st == p.Spec.ContainerSpec.Labels['com.docker.stack.namespace']
                                  && p.DesiredState=="running" && node.ID==p.NodeID
                            }).forEach((p, i, procs) => {
-                             
                              var color = "BGCOLOR=\""
                                         +(p.Status.State=='running'
-                                         ?"springgreen"
+                                         ?((new Date())-(new Date(p.UpdatedAt))<3600000
+                                          ?"springgreen"
+                                          :"springgreen3")
                                          :(p.Status.State=='starting'
                                           ?"darkorange"
                                           :"indianred1"))
                                         +"\""
+                             var color1 = p.Status.State=='running'
+                                        ? "BGCOLOR=\"springgreen3\""
+                                        : color
                              res += "        <TR>"
                              if (first)
                                res += "<TD ROWSPAN=\""+procs.length
-                                     +"\" PORT=\""+st+"\" "+color+"><B>"
+                                     +"\" PORT=\""+st+"\" "+color1+"><B>"
                                      +st
                                      +"</B></TD>"
                              res += "<TD "+color+">"
@@ -156,11 +204,13 @@ function Graphics() {
                          res += "      </TABLE>\n"
                                +"    >,fillcolor="
                                +((node.Status.State!='ready'||
-                                  (node.ManagerStatus&&node.ManagerStatus.Reachability)!='reachable')
+                                  (node.ManagerStatus&&node.ManagerStatus.Reachability!='reachable'))
                                 ?'indianred3'
                                 :(node.Spec.Availability=='active'
                                  ?'springgreen3'
-                                 :'darkorange3'))+"];\n"
+                                 :(node.Spec.Availability=='drain'
+                                  ?'gray'
+                                  :'darkorange3')))+"];\n"
                          return res
                        })()
                })
