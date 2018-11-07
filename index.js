@@ -1,8 +1,8 @@
 module.exports = function(app, io, updateContainerInterval, updateStatsInterval) {
 
   /// @todo change from exec to this
-  //const {Docker} = require('node-docker-api')
-  //const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+  var Docker = require('dockerode')
+  var docker = new Docker()
 
   var running="";
   var proc = require('child_process');
@@ -57,10 +57,16 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
       else updatenodes();
     }
     
-    function stacks() {
-      console.log("-> stacks");
-      if (oldstack) emit("docker.stacks", oldstack);
-      else updatestacks();
+    function services() {
+      console.log("-> services");
+      if (oldservice) emit("docker.services", oldservice);
+      else updateservices();
+    }
+    
+    function tasks() {
+      console.log("-> tasks");
+      if (oldtask) emit("docker.tasks", oldtask);
+      else updatetask();
     }
     
     function images() {
@@ -146,7 +152,8 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     socket
       .on("docker.containers", containers)
       .on("docker.nodes", nodes)
-      .on("docker.stacks", stacks)
+      .on("docker.services", services)
+      .on("docker.tasks", tasks)
       .on("docker.images", images)
       .on("docker.container.start", start)
       .on("docker.container.stop", stop)
@@ -179,135 +186,79 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
     console.log("** "+txt, data);
   }
 
-  var oldstack = null;
-  function stackinspect(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("inspect docker stacks failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    stdout = stdout.replace(/\n/g, '').replace(/,\]/g, ']')
-    if (oldstack!=stdout)
-      broadcast("docker.stacks", stdout)
-    oldstack = stdout;
-  }
-  
-  function stacklist(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("list docker stacks failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    var stacks = stdout.trim().split("\n")
-    var cmd = 'echo -n \'[\'; '
-    stacks.forEach((name) => {
-      cmd += 'echo -n \'{"name":"'+name+'","processes":[\'; '
-      cmd += 'docker stack ps --format \'{"id":{{json .ID}},"name":{{json .Name}},"image":{{json .Image}},"node":{{json .Node}},"state":{"desired":{{json .DesiredState}},"current":{{json .CurrentState}}},"error":{{json .Error}},"ports":{{json .Ports}}},\' '+name+'; '
-      cmd += 'echo -n \'],"services":[\'; '
-      cmd += 'docker stack services --format \'{"id":{{json .ID}},"name":{{json .Name}},"mode":{{json .Mode}},"replicas":{{json .Replicas}},"image":{{json .Image}},"ports":{{json .Ports}}},\' '+name+'; '
-      cmd += 'echo -n "]},";'
-    })
-    cmd += 'echo -n \']\'; '
-    //console.log(cmd.replace(/; /g, ";\n"))
-    exec(cmd, stackinspect)
+  var oldservice = null;
+  function servicelist(error, data) {
+    if (error)
+      return fail("list docker services failed", {
+        error: error, data: data
+      })
+    if (oldservice!=data)
+      broadcast("docker.services", data)
+    oldservice = data
   }
 
-  function updatestacks(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("update docker stacks failed", {
-        error: error, stderr: stderr, stdout: stdout
+  function updateservices() {
+    docker.listServices(servicelist)
+  }
+
+  var oldtask = null;
+  function tasklist(error, data) {
+    if (error)
+      return fail("list docker tasks failed", {
+        error: error, data: data
       })
-    exec('docker stack ls --format \'{{.Name}}\'', stacklist)
+    if (oldtask!=data)
+      broadcast("docker.tasks", data)
+    oldtask = data
+  }
+
+  function updatetasks() {
+    docker.listTasks(tasklist)
   }
 
   var oldnode = null;
-  function nodeinspect(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("inspect docker nodes failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    if (oldnode!=stdout) broadcast("docker.nodes", stdout);
-    oldnode = stdout;
-  }
-  
-  function nodelist(error, stdout, stderr) {
-    if (error || stderr)
+  function nodelist(error, data) {
+    if (error)
       return fail("list docker nodes failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    exec("docker node inspect "+stdout.trim().replace(/\n/g, " "), nodeinspect);
+        error: error, data: data
+      })
+    if (oldnode!=data)
+      broadcast("docker.nodes", data);
+    oldnode = data
   }
 
-  function updatenodes(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("update docker nodes failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    exec("docker node ls -q", nodelist);
+  function updatenodes() {
+    docker.listNodes(nodelist)
   }
 
   var oldimage = null;
-  function imageinspect(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("inspect docker images failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    if (oldimage && oldimage==stdout) return; // do not resend same images
-    oldimage = stdout;
-    broadcast("docker.images", stdout);
-  }
-
-  function imagelist(error, stdout, stderr) {
-    if (error || stderr)
+  function imagelist(error, data) {
+    if (error)
       return fail("list docker images failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    exec("docker inspect "+stdout.trim().replace(/\n/g, " "), imageinspect);
+        error: error, data: data
+      })
+    if (data!=oldimage)
+      broadcast("docker.images", data)
+    oldimage = data
   }
 
-  function updateimages(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("update docker images failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    exec("docker images -q --no-trunc", imagelist);
+  function updateimages() {
+    docker.listImages(imagelist)
   }
   
   var oldcontainer = null;
-  function containerinspect(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("inspect docker containers failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    running = "";
-    JSON.parse(stdout).forEach(function(n) {
-      if (n.State.Running) running+=" "+n.Name.replace(/^\//, '');
-    });
-    if (oldcontainer!=stdout) broadcast("docker.containers", stdout);
-    oldcontainer = stdout;
-  }
-  
-  function containerlist(error, stdout, stderr) {
-    if (error || stderr)
+  function containerlist(error, data) {
+    if (error)
       return fail("list docker containers failed", {
-        error: error, stderr: stderr, stdout: stdout
+        error: error, data: data
       });
-    var containers = stdout.trim().replace(/\n/g, " ");
-    exec("docker inspect "+containers, containerinspect);
+    if (data!=oldcontainer)
+      broadcast("docker.containers", data)
+    oldcontainer = data
   }
   
-  function updatecontainers(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("update docker container failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    exec("docker ps -aq --no-trunc ", containerlist);
-  }
-
-  function stats(error, stdout, stderr) {
-    if (error || stderr)
-      return fail("get containers stats failed", {
-        error: error, stderr: stderr, stdout: stdout
-      });
-    broadcast("docker.stats", stdout);
+  function updatecontainers() {
+    docker.listContainers(containerlist)
   }
 
   //==============================================================================
@@ -334,26 +285,16 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
   }
 
   function updateall() {
-    console.log('UPDATE:IMAGES')
     updateimages()
-    console.log('UPDATE:CONTAINERS')
     updatecontainers()
-    console.log('UPDATE:NODES')
-    updatestacks()
-    console.log('UPDATE:STACKS')
+    updateservices()
+    updatetasks()
     updatenodes()
-    console.log('UPDATE:done')
   }
   
   // Periodic Update of Images and Containers
   updateall()
   setInterval(updateall, updateContainerInterval||5000)
 
-  // Periodic Update of Stats
-  if (!updateStatsInterval) updateStatsInterval = 2000;
-  setInterval(function() {
-    if (running) exec('docker stats --no-stream'+running, stats);
-  }, updateStatsInterval);
-  
   return this;  
 }
