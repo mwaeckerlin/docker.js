@@ -61,7 +61,7 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                    var protocol = null
                    if (s.Endpoint && s.Endpoint.Ports)
                      s.Endpoint.Ports.forEach((p) => {
-                       ports[p.PublishedPort] = p;
+                       ports[p.PublishedPort] = s;
                        if (lastport) {
                          if (protocol!=p.Protocol || p.PublishedPort>lastport+1) {
                            if (firstport==lastport)
@@ -100,13 +100,19 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                              +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
                    }
                    // add port forwarding as specified in label 'forwards'
+                 })
+                 services.forEach((s) => {
                    if (s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'])
                      s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'].split(' ').forEach((port) => {
-                       if (ports[port])
+                       if (ports[port]) {                         
                          res += "      \""+s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
                                +"\" -> \""+port+"\";\n"
+                         if (ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url'])
+                           res += "      \""+ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
+                                 +"\" -> \""+s.Spec.Labels['com.docker.stack.namespace']+"\";\n"
+                       }
                      })
-                 })
+                   })
                  return res
                })()
       // stacks
