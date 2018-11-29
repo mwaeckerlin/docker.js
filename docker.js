@@ -109,6 +109,10 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                                +"\" -> \""+port+"\";\n"
                          if (ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url'])
                            res += "      \""+ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
+                                 +"\" [href=\""
+                                 +ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
+                                 +"\"];\n      \""
+                                 +ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
                                  +"\" -> \""+s.Spec.Labels['com.docker.stack.namespace']+"\";\n"
                        }
                      })
