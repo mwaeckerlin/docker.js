@@ -38,6 +38,7 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
       var nodes = docker.nodes.get()
       var services = docker.services.get()
       var tasks = docker.tasks.get()
+      var ports = {};
       var stacks = services. /* filter((s) => {
                                 return s.Spec.Labels['com.docker.stack.namespace']
                                 }). */ map((s) => {
@@ -60,6 +61,7 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                    var protocol = null
                    if (s.Endpoint && s.Endpoint.Ports)
                      s.Endpoint.Ports.forEach((p) => {
+                       ports[p.PublishedPort] = p;
                        if (lastport) {
                          if (protocol!=p.Protocol || p.PublishedPort>lastport+1) {
                            if (firstport==lastport)
@@ -97,10 +99,12 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                              +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
                              +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
                    }
+                   // add port forwarding as specified in label 'forwards'
                    if (s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'])
                      s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'].split(' ').forEach((port) => {
-                       res += "      \""+s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
-                             +" -> \""+port+"\";\n"
+                       if (ports[port])
+                         res += "      \""+s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                               +"\" -> \""+port+"\";\n"
                      })
                  })
                  return res
