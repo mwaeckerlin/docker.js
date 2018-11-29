@@ -97,6 +97,11 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                              +s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
                              +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
                    }
+                   if (s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'])
+                     s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'].split(' ').forEach((port) => {
+                       res += "      \""+s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                             +" -> \""+port+"\";\n"
+                     })
                  })
                  return res
                })()
@@ -110,9 +115,10 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                          +"      <TABLE>\n"
                          +"        <TR><TD COLSPAN=\"4\"><FONT POINT-SIZE=\"24\"><B>"+st+"</B></FONT></TD></TR>\n"
                    // services in stacks
-                   services.filter((s) => {
+                   var stackservices = services.filter((s) => {
                      return st == s.Spec.Labels['com.docker.stack.namespace']
-                   }).forEach((s) => {
+                   })
+                   stackservices.forEach((s) => {
                      var localerror = 0
                      if ((new Date())-(new Date(s.UpdatedAt))<3600000)
                        localerror = 1
@@ -145,6 +151,13 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                            :"indianred3"))
                          +link
                          +"];\n"
+                   stackservices.forEach((s) => {
+                     if (s.Spec.TaskTemplate.ContainerSpec.Labels['urls'])
+                       s.Spec.TaskTemplate.ContainerSpec.Labels['urls'].split(' ').forEach((url) => {
+                         res += "    \""+url+"\" [href=\""+url+"\"];\n"
+                               +"    \""+url+"\" -> \""+st+"\";\n"
+                       })
+                   })
                  })
                  return res
                })()
@@ -259,7 +272,6 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
   }
 
   function emit(signal, data) {
-    console.log("<-snd "+signal, data);
     socket.emit(signal, data);
   }
 
@@ -770,7 +782,6 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
             emit("docker.container.bash.start", name);
             $("#screen").focus();
             $("#screen").keypress(function(e) {
-              console.log("keypress", e);
               e.preventDefault();
               if (e.keyCode) emit("docker.container.bash.input", {name: name, text: String.fromCharCode(e.keyCode)});
               else if (e.charCode) emit("docker.container.bash.input", {name: name, text: String.fromCharCode(e.charCode)});
@@ -904,7 +915,6 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
   }
 
   function sigcontainers(c) {
-    console.log("->rcv containers");
     docker.containers.set(c);
     if (focused && docker.containers.exists(focused))
       details(focused);
@@ -913,29 +923,22 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
   }
   
   function signodes(c) {
-    console.log("->rcv nodes");
     docker.nodes.set(c)
     docker.nodes.show()
   }
   
   function sigservices(c) {
-    console.log("->rcv services");
     docker.services.set(c)
     if (sigstack) sigstack()
   }
   
   function sigtasks(c) {
-    console.log("->rcv tasks");
     docker.tasks.set(c)
     if (sigstack) sigstack()
   }
   
   var laststats=null;
   function stats(data) {
-    if (data)
-      console.log("->rcv stats");
-    else
-      data=laststats;
     if (!data) return;
     var lines = data.split("\n");
     var head = lines.shift();
