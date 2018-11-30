@@ -23,7 +23,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
 
     function fail(txt, data) {
       console.log("** "+txt, data);
-      emit("docker.fail", txt);
+      emit("docker.fail", {'msg': txt, 'data': data});
     }
 
     function modify(cmd, name) {

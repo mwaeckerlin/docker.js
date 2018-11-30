@@ -166,7 +166,7 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                       +  "</TD><TD PORT=\"l"+s.ID+"\" "+color+">"+(s.Spec.Mode.Replicated?s.Spec.Mode.Replicated.Replicas:"")+"</TD></TR>\n"
                 })
                 res += "      </TABLE>\n"
-                res +  "    >,fillcolor="
+                    +  "    >,fillcolor="
                     +  (error==0
                        ?colors.status.running
                        :(error==1
@@ -298,7 +298,6 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
       try {
         return Viz(dot)
       } catch(e) {
-        if (!err) throw(e);
         var codelines = dot.replace(/&/g, '&amp;')
                             .replace(/</g, '&lt;')
                             .replace(/>/g, '&gt;')
@@ -306,7 +305,7 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
         codelines.forEach(function(v, i, a) {
             a[i] = ("000"+(i+1)).slice(-3)+": "+v;
           })
-        err(e, codelines.join("\n"))
+        throw({'msg': e, 'data': codelines.join("\n")})
       }
     }
   }
