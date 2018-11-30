@@ -270,7 +270,7 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                 if (s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'])
                   s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'].split(' ').forEach((port) => {
                     if (ports[port]) {                         
-                      res += "      \""+s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
+                      res += "      \""+s.Spec.Labels['com.docker.stack.namespace']
                           +  "\" -> \""+port+"\";\n"
                       if (ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url'])
                         res += "      \""+ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
