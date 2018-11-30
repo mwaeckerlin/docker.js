@@ -93,14 +93,14 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                 if (protocol!=p.Protocol || p.PublishedPort>lastport+1) {
                   if (firstport==lastport)
                     res += "      \""+firstport+"\";\n"
-                          +"      \""+firstport+"\" -> \""
-                          +s.Spec.Labels['com.docker.stack.namespace']
-                          +"\" [label=\""+firsttargetport+'/'+protocol+"\"];\n"
+                        +  "      \""+firstport+"\" -> \""
+                        +  s.Spec.Labels['com.docker.stack.namespace']
+                        +  "\" [label=\""+firsttargetport+'/'+protocol+"\"];\n"
                   else
                     res += "      \""+firstport+"-"+lastport+"\";\n"
-                          +"      \""+firstport+"-"+lastport+"\" -> \""
-                          +s.Spec.Labels['com.docker.stack.namespace']
-                          +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
+                        +  "      \""+firstport+"-"+lastport+"\" -> \""
+                        +  s.Spec.Labels['com.docker.stack.namespace']
+                        +  "\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
                   firstport = lastport = p.PublishedPort
                   firsttargetport = lasttargetport = p.TargetPort
                   protocol = p.Protocol
@@ -117,14 +117,14 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
           if (firstport) {
             if (firstport==lastport)
               res += "      \""+firstport+"\";\n"
-                    +"      \""+firstport+"\" -> \""
-                    +s.Spec.Labels['com.docker.stack.namespace']
-                    +"\" [label=\""+firsttargetport+'/'+protocol+"\"];\n"
+                  +  "      \""+firstport+"\" -> \""
+                  +  s.Spec.Labels['com.docker.stack.namespace']
+                  +  "\" [label=\""+firsttargetport+'/'+protocol+"\"];\n"
             else
               res += "      \""+firstport+"-"+lastport+"\";\n"
-                    +"      \""+firstport+"-"+lastport+"\" -> \""
-                    +s.Spec.Labels['com.docker.stack.namespace']
-                    +"\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
+                  +  "      \""+firstport+"-"+lastport+"\" -> \""
+                  +  s.Spec.Labels['com.docker.stack.namespace']
+                  +  "\" [label=\""+firsttargetport+"-"+lasttargetport+'/'+protocol+"\"];\n"
           }
         })
         return res
@@ -136,8 +136,8 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                 var error = 0
                 var link = ""
                 res += "    \""+st+"\" [shape=box,label=< \n"
-                      +"      <TABLE>\n"
-                      +"        <TR><TD COLSPAN=\"4\"><FONT POINT-SIZE=\"24\"><B>"+st+"</B></FONT></TD></TR>\n"
+                    +  "      <TABLE>\n"
+                    +  "        <TR><TD COLSPAN=\"4\"><FONT POINT-SIZE=\"24\"><B>"+st+"</B></FONT></TD></TR>\n"
                 // services in stacks
                 services.filter((s) => {
                   return st == s.Spec.Labels['com.docker.stack.namespace']
@@ -160,20 +160,20 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                   if (s.Spec.TaskTemplate.ContainerSpec.Labels['url'])
                     link = ",href=\""+s.Spec.TaskTemplate.ContainerSpec.Labels['url']+"\""
                   res += "        <TR><TD PORT=\""+s.ID+"\" "+color+"\>"
-                        +s.Spec.Name.replace(st+'_', '')
-                        +"</TD><TD "+color+">"+s.Spec.TaskTemplate.ContainerSpec.Image.replace(/@.*$/, '').replace(/:latest$/, '')
-                        +"</TD><TD "+color+">"+datediff(new Date(s.UpdatedAt))
-                        +"</TD><TD PORT=\"l"+s.ID+"\" "+color+">"+(s.Spec.Mode.Replicated?s.Spec.Mode.Replicated.Replicas:"")+"</TD></TR>\n"
+                      +  s.Spec.Name.replace(st+'_', '')
+                      +  "</TD><TD "+color+">"+s.Spec.TaskTemplate.ContainerSpec.Image.replace(/@.*$/, '').replace(/:latest$/, '')
+                      +  "</TD><TD "+color+">"+datediff(new Date(s.UpdatedAt))
+                      +  "</TD><TD PORT=\"l"+s.ID+"\" "+color+">"+(s.Spec.Mode.Replicated?s.Spec.Mode.Replicated.Replicas:"")+"</TD></TR>\n"
                 })
                 res += "      </TABLE>\n"
-                res += "    >,fillcolor="
-                      +(error==0
+                res +  "    >,fillcolor="
+                    +  (error==0
                        ?colors.status.running
                        :(error==1
                         ?colors.status.started
                         :colors.status.dead))
-                      +link
-                      +"];\n"
+                    +  link
+                    +  "];\n"
               })
               return res
             })()
@@ -182,77 +182,77 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
               var res = ""
               if (!nodes) return res;
               res += "  subgraph clusterNodes {\n"
-                    +"    style=invis;\n"
+                  +  "    style=invis;\n"
               nodes.forEach((node) => {
                 res += "    \""+node.ID+"\" [shape=box,label=<\n"
-                      +"      <TABLE>"
-                      +"        <TR><TD BGCOLOR=\""
-                      +(node.Spec.Role!="manager"
+                    +  "      <TABLE>"
+                    +  "        <TR><TD BGCOLOR=\""
+                    +  (node.Spec.Role!="manager"
                        ?colors.node.manager
                        :(node.ManagerStatus&&node.ManagerStatus.Leader
                         ?colors.node.leader
                         :colors.node.worker))
-                      +"\" COLSPAN=\"4\"><FONT POINT-SIZE=\"24\"><B>"+node.Description.Hostname+"</B></FONT></TD></TR>\n"
-                      +"        <TR><TD>Platform:</TD><TD COLSPAN=\"3\">"+node.Description.Platform.OS+" "+node.Description.Platform.Architecture+"</TD></TR>\n"
-                      +"        <TR><TD>Engine:</TD><TD COLSPAN=\"3\">"+node.Description.Engine.EngineVersion+"</TD></TR>\n"
-                      +"        <TR><TD>CPUs:</TD><TD COLSPAN=\"3\">"+(node.Description.Resources.NanoCPUs/1000000000)+"</TD></TR>\n"
-                      +"        <TR><TD>Memory:</TD><TD COLSPAN=\"3\">"+nicebytes(node.Description.Resources.MemoryBytes)+"</TD></TR>\n"
-                      +"        <TR><TD>Addr:</TD><TD COLSPAN=\"3\">"+node.Status.Addr+"</TD></TR>\n"
+                    +  "\" COLSPAN=\"4\"><FONT POINT-SIZE=\"24\"><B>"+node.Description.Hostname+"</B></FONT></TD></TR>\n"
+                    +  "        <TR><TD>Platform:</TD><TD COLSPAN=\"3\">"+node.Description.Platform.OS+" "+node.Description.Platform.Architecture+"</TD></TR>\n"
+                    +  "        <TR><TD>Engine:</TD><TD COLSPAN=\"3\">"+node.Description.Engine.EngineVersion+"</TD></TR>\n"
+                    +  "        <TR><TD>CPUs:</TD><TD COLSPAN=\"3\">"+(node.Description.Resources.NanoCPUs/1000000000)+"</TD></TR>\n"
+                    +  "        <TR><TD>Memory:</TD><TD COLSPAN=\"3\">"+nicebytes(node.Description.Resources.MemoryBytes)+"</TD></TR>\n"
+                    +  "        <TR><TD>Addr:</TD><TD COLSPAN=\"3\">"+node.Status.Addr+"</TD></TR>\n"
                 // tasks
-                      +(() => {
-                        var res = ""
-                        if (!stacks) return res;
-                        stacks.forEach((st) => {
-                          var first = true
-                          tasks.filter((p) => {
-                            return st == p.Spec.ContainerSpec.Labels['com.docker.stack.namespace']
-                                && p.DesiredState=="running" && node.ID==p.NodeID
-                          }).forEach((p, i, procs) => {
-                            var color = "BGCOLOR=\""
-                                       +(p.Status.State=='running'
-                                        ?((new Date())-(new Date(p.UpdatedAt))<3600000
-                                         ?colors.status.started
-                                         :colors.status.running)
-                                        :(p.Status.State=='starting'
-                                         ?colors.status.starting
-                                         :colors.status.dead))
-                                       +"\""
-                            var color1 = p.Status.State=='running'
-                                       ? "BGCOLOR=\""+colors.status.running+"\""
-                                       : color
-                            res += "        <TR>"
-                            if (first)
-                              res += "<TD ROWSPAN=\""+procs.length
-                                    +"\" PORT=\""+st+"\" "+color1+"><B>"
-                                    +st
-                                    +"</B></TD>"
-                            res += "<TD "+color+">"
-                                  +(() => {
-                                    var res = ""
-                                    services.filter((s) => {
-                                      return s.ID == p.ServiceID
-                                    }).forEach((s) => {
-                                      res += s.Spec.Name.replace(st+'_', '')
-                                    })
-                                    return res
-                                  })()
-                                  +"</TD><TD "+color+">"+p.Status.State
-                                  +"</TD><TD "+color+">"+datediff(new Date(p.UpdatedAt))+"</TD></TR>\n"
-                            first = false
-                          })
+                    +  (() => {
+                      var res = ""
+                      if (!stacks) return res;
+                      stacks.forEach((st) => {
+                        var first = true
+                        tasks.filter((p) => {
+                          return st == p.Spec.ContainerSpec.Labels['com.docker.stack.namespace']
+                              && p.DesiredState=="running" && node.ID==p.NodeID
+                        }).forEach((p, i, procs) => {
+                          var color = "BGCOLOR=\""
+                                    + (p.Status.State=='running'
+                                      ?((new Date())-(new Date(p.UpdatedAt))<3600000
+                                       ?colors.status.started
+                                       :colors.status.running)
+                                      :(p.Status.State=='starting'
+                                       ?colors.status.starting
+                                       :colors.status.dead))
+                                    + "\""
+                          var color1 = p.Status.State=='running'
+                                     ? "BGCOLOR=\""+colors.status.running+"\""
+                                     : color
+                          res += "        <TR>"
+                          if (first)
+                            res += "<TD ROWSPAN=\""+procs.length
+                                +  "\" PORT=\""+st+"\" "+color1+"><B>"
+                                +  st
+                                +  "</B></TD>"
+                          res += "<TD "+color+">"
+                              +  (() => {
+                                var res = ""
+                                services.filter((s) => {
+                                  return s.ID == p.ServiceID
+                                }).forEach((s) => {
+                                  res += s.Spec.Name.replace(st+'_', '')
+                                })
+                                return res
+                              })()
+                              +  "</TD><TD "+color+">"+p.Status.State
+                              +  "</TD><TD "+color+">"+datediff(new Date(p.UpdatedAt))+"</TD></TR>\n"
+                          first = false
                         })
-                        res += "      </TABLE>\n"
-                              +"    >,fillcolor="
-                              +((node.Status.State!='ready'||
-                                 (node.ManagerStatus&&node.ManagerStatus.Reachability!='reachable'))
-                               ?colors.availability.dead
-                               :(node.Spec.Availability=='active'
-                                ?colors.availability.active
-                                :(node.Spec.Availability=='drain'
-                                 ?colors.availability.drain
-                                 :colors.availability.unknown)))+"];\n"
-                        return res
-                      })()
+                      })
+                      res += "      </TABLE>\n"
+                          +  "    >,fillcolor="
+                          +  ((node.Status.State!='ready'||
+                               (node.ManagerStatus&&node.ManagerStatus.Reachability!='reachable'))
+                             ?colors.availability.dead
+                             :(node.Spec.Availability=='active'
+                              ?colors.availability.active
+                              :(node.Spec.Availability=='drain'
+                               ?colors.availability.drain
+                               :colors.availability.unknown)))+"];\n"
+                      return res
+                    })()
               })
               res += "  }\n"
               // connect stacks with tasks
@@ -271,20 +271,21 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
                   s.Spec.TaskTemplate.ContainerSpec.Labels['forwards'].split(' ').forEach((port) => {
                     if (ports[port]) {                         
                       res += "      \""+s.Spec.Labels['com.docker.stack.namespace']+"\":\""+s.ID
-                            +"\" -> \""+port+"\";\n"
+                          +  "\" -> \""+port+"\";\n"
                       if (ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url'])
                         res += "      \""+ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
-                              +"\" [href=\""
-                              +ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
-                              +"\"];\n      \""
-                              +ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
-                              +"\" -> \""+s.Spec.Labels['com.docker.stack.namespace']+"\";\n"
+                            +  "\" [href=\""
+                            +  ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
+                            +  "\"];\n      \""
+                            +  ports[port].Spec.TaskTemplate.ContainerSpec.Labels['url']
+                            +  "\" -> \""+s.Spec.Labels['com.docker.stack.namespace']+"\";\n"
                     }
                   })
                 if (s.Spec.TaskTemplate.ContainerSpec.Labels['urls'])
                   s.Spec.TaskTemplate.ContainerSpec.Labels['urls'].split(' ').forEach((url) => {
                     res += "    \""+url+"\" [href=\""+url+"\"];\n"
-                          +"    \""+url+"\" -> \""+st+"\";\n"
+                        +  "    \""+url+"\" -> \""+s.Spec.Labels['com.docker.stack.namespace']
+                        +  "\";\n"
                   })
               })
               return res
