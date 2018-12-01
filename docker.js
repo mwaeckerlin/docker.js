@@ -1,4 +1,4 @@
-var Docker = function(socket, error, sigstack, container_element, nodes_element) {
+var Docker = function(socket, error, sigstack, sigcontainer) {
 
   var focused = null;
   var viz = null;
@@ -36,21 +36,26 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
 
     this.colors = {
       'status': {
-        'running':  'springgreen3', // stable since more than an hour
-        'started':  'springgreen',  // started within the last hour
-        'starting': 'darkorange',   // starting but not yet ready
-        'dead':     'indianred1'    // no running process
+        'created':    'yellow',       // created but not yet started
+        'running':    'springgreen3', // stable since more than an hour
+        'started':    'springgreen',  // started within the last hour
+        'starting':   'darkorange',   // starting but not yet ready
+        'restarting': 'lightsalmon',  // process is unstable and restarting
+        'stopped':    'yellow',       // manually stopped
+        'paused':     'lightskyblue', // manually paused
+        'dead':       'indianred1',   // died, no running process
+        'exited':     'indianred1'    // exited, no running process
       },
       'node': {
-        'manager':  'turquoise1',   // node is a manager but not the leader
-        'leader':   'greenyellow',  // node is the lead manager
-        'worker':   'palegreen'     // node is a worker
+        'manager':    'turquoise1',   // node is a manager but not the leader
+        'leader':     'greenyellow',  // node is the lead manager
+        'worker':     'palegreen'     // node is a worker
       },
       'availability': {
-        'active':   'springgreen3', // node is ready, active and reachable
-        'drain':    'gray',         // node is drained
-        'dead':     'indianred1',   // node is not ready or not reachable
-        'unknown':  'darkorange'    // nothing of the above
+        'active':     'springgreen3', // node is ready, active and reachable
+        'drain':      'gray',         // node is drained
+        'dead':       'indianred1',   // node is not ready or not reachable
+        'unknown':    'darkorange'    // nothing of the above
       }
     }
 
@@ -58,6 +63,82 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
       'rankdir': 'LR',
       'nodesep': 1,
       'ranksep': 3
+    }
+
+    this.standalone = (parameters = this.parameters, colors = this.colors) => {
+      var res = "digraph {\n"
+              + "  node [style=filled];\n"
+      for (var name in parameters) {
+        res += name+'="'+parameters[name]+'";\n'
+      }
+      var volumes = docker.volumes.get()
+      var containers = docker.containers.get()
+      var usedvolumes = {}
+      containers.filter((c) => {
+        return !c.Labels['com.docker.swarm.service.id']
+      }).forEach((c) => {
+        // container
+        var name = c.Names.find((n) => {return !n.match(/\/.*\//)}).replace(/^\//, '')
+        var url = c.Labels['url']
+        var color = colors.status[c.State] ? colors.status[c.State] : 'grey40'
+        res += '  "'+c.Id+'" [label=<<font point-size="10">'+c.Image+'</font><br/><b>'+name+'</b><br/><font point-size="10">'+c.Status+'</font>>'
+            +  ',color='+color
+            +  (url?',href="'+url+'"':'')+'];\n'
+        // ports
+        c.Ports.forEach((p) => {
+          res += '  "'+p.IP+':'+p.PublicPort+'" [label="'+p.PublicPort+'"];\n'
+              +  '  "'+p.IP+':'+p.PublicPort+'" -> "'+c.Id+'" [label="'+p.PrivatePort+'/'+p.Type+'"];\n'
+        })
+        // links
+        var links = c.Names.filter((n) => {return n.match(/^\/[^/]+\/[^/]+/)})
+        links.forEach((link) => {
+          var d = link.replace(/^\//, '').split('/')
+          res += '  "'+containers.find((c) => {
+            return c.Names.find((n) => {return n=='/'+d[0]})
+          }).Id+'" -> "'+c.Id+'" [label="'+d[1]+'"]\n;'
+        })
+        // volumes
+        if (c.Mounts) c.Mounts.forEach((m) => {
+          switch (m.Type) {
+            case 'bind': {
+              res += '  "'+m.Source+'" [shape=box];\n'
+                  +  '  "'+c.Id+'" -> "'+m.Source
+                  +  '" [style=dashed,label=<'+m.Destination+'<font point-size="10">:'+(m.RW?'rw':'ro')+'</font>>];\n'
+            } break
+            case 'volume': {
+              var v = volumes.find((v) => {return v.Name==m.Name})
+              if (!v)
+                break
+              if (v.Driver=='local' && v.Mountpoint.match(/^\/var\/lib\/docker\/volumes\//)) {
+                usedvolumes[m.Name] = true
+              } else {
+                res += '  "'+m.Name+'" [shape=box];\n'
+                    +  '  "'+name+'" -> "'+m.Name
+                    +  '" [style=dashed,label=<'+m.Destination+'<font point-size="10">:'+(m.RW?'rw':'ro')+'</font>>];\n'
+              }
+            } break
+          }
+        })
+      })
+      // handle volumes-from
+      for (var volname in usedvolumes) {
+        var m = null
+        res += '  "'
+            +  containers.filter((p) => {
+              return p.Mounts && p.Mounts.find((pm) => {
+                if (pm.Type=='volume' && pm.Name==volname) {
+                  m = pm
+                  return true
+                }
+                return false
+              })
+            }).map((p) => {
+              return p.Id
+            }).join('" -> "')
+        res += '" [dir=none,style=dashed,label=<'+m.Destination+'<font point-size="10">:'
+            +  (m.RW?'rw':'ro')+'</font>>];\n'
+      }
+      return res += "}"
     }
     
     this.stack = (parameters = this.parameters, colors = this.colors) => {
@@ -337,48 +418,6 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
   }
   
   var _docker = this;
-  
-  
-  this.Nodes = function() {
-
-    var _nodes = this;
-    var nodes = [];
-
-    this.show = function() {
-      if (!nodes_element) return;
-      $(nodes_element).empty()
-      nodes.forEach((n) => {
-        var color = 'grey'
-        switch (n.Spec.Availability) {
-          case "active":
-            color = 'green'
-            break
-        }
-        $(nodes_element).append(
-          '<table style="background-color: '+color+'">'
-         +'<thead>'
-         +'<tr><td>'+n.Description.Hostname+'</td></tr>'
-         +'</thead>'
-         +'<tbody>'
-         +'<tr><td>'+n.Spec.Role+'</td></tr>'
-         +'<tr><td>'+n.Description.Platform.Architecture+'</td></tr>'
-         +'<tr><td>'+n.Description.Platform.OS+'</td></tr>'
-         +'</tbody>'
-         +'</table>')
-      })
-    }
-
-    this.get = function() {
-      return nodes
-    }
-
-    this.set = function(c) {
-      if (typeof c == "string") c = JSON.parse(c);
-      if (typeof c != "object") throw "wrong format: "+(typeof c);
-      nodes = c;
-    }
-    
-  }
   
   this.Images = function() {
 
@@ -866,43 +905,29 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
   }
 
 
-  this.Services = function() {
+  this.Storage = function() {
 
-    var services = []
+    var storage = []
 
     this.get = function() {
-      return services
+      return storage
     }
 
     this.set = function(c) {
       if (typeof c == "string") c = JSON.parse(c);
       if (typeof c != "object") throw "wrong format: "+(typeof c);
-      services = c;
+      storage = c;
     }
     
-  }
-  
-  this.Tasks = function() {
-    
-    var tasks = []
-
-    this.get = function() {
-      return tasks
-    }
-
-    this.set = function(c) {
-      if (typeof c == "string") c = JSON.parse(c);
-      if (typeof c != "object") throw "wrong format: "+(typeof c);
-      tasks = c;
-    } 
   }
 
   this.graphics = new Graphics()
-  this.services = new this.Services()
-  this.tasks = new this.Tasks()
+  this.volumes = new this.Storage()
+  this.containers = new this.Storage()
+  this.services = new this.Storage()
+  this.tasks = new this.Storage()
   this.images = new this.Images();
-  this.containers = new this.Containers()
-  this.nodes = new this.Nodes()
+  this.nodes = new this.Storage()
 
   this.rotate = function() {
     if (!viz) return;
@@ -954,16 +979,18 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
   }
 
   function sigcontainers(c) {
-    docker.containers.set(c);
-    if (focused && docker.containers.exists(focused))
-      details(focused);
-    else
-      overview();
+    docker.containers.set(c)
+    if (sigcontainer) sigcontainer()
+  }
+  
+  function sigvolumes(c) {
+    docker.volumes.set(c)
+    if (sigcontainer) sigcontainer()
   }
   
   function signodes(c) {
     docker.nodes.set(c)
-    docker.nodes.show()
+    if (sigstack) sigstack()
   }
   
   function sigservices(c) {
@@ -1004,12 +1031,14 @@ var Docker = function(socket, error, sigstack, container_element, nodes_element)
 
   socket
     .on("docker.fail", error)
-    //.on("docker.containers", sigcontainers)
+    .on("docker.containers", sigcontainers)
+    .on("docker.volumes", sigvolumes)
     .on("docker.nodes", signodes)
     .on("docker.services", sigservices)
     .on("docker.tasks", sigtasks)
     //.on("docker.stats", stats)
-  //emit("docker.containers")
+  emit("docker.containers")
+  emit("docker.volumes")
   emit("docker.nodes")
   emit("docker.services")
   emit("docker.tasks")

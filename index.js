@@ -50,6 +50,12 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
       if (oldcontainer) emit("docker.containers", oldcontainer);
       else updatecontainers();
     }
+
+    function volumes() {
+      console.log("-> volumes");
+      if (oldvolume) emit("docker.volumes", oldvolume);
+      else updatevolumes();
+    }
     
     function nodes() {
       console.log("-> nodes");
@@ -151,21 +157,22 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
 
     socket
       .on("docker.containers", containers)
+      .on("docker.volumes", volumes)
       .on("docker.nodes", nodes)
       .on("docker.services", services)
       .on("docker.tasks", tasks)
       .on("docker.images", images)
-      .on("docker.container.start", start)
-      .on("docker.container.stop", stop)
-      .on("docker.container.pause", pause)
-      .on("docker.container.unpause", unpause)
-      .on("docker.container.remove", remove)
-      .on("docker.container.create", create)
-      .on('docker.container.logs', logs)
-      .on('docker.bash.start', bash_start)
-      .on('docker.bash.input', bash_input)
-      .on('docker.bash.end', bash_end);
-
+    /* .on("docker.container.start", start)
+     * .on("docker.container.stop", stop)
+     * .on("docker.container.pause", pause)
+     * .on("docker.container.unpause", unpause)
+     * .on("docker.container.remove", remove)
+     * .on("docker.container.create", create)
+     * .on('docker.container.logs', logs)
+     * .on('docker.bash.start', bash_start)
+     * .on('docker.bash.input', bash_input)
+     * .on('docker.bash.end', bash_end);
+     */
   }
 
   function broadcast(signal, data) {
@@ -258,7 +265,23 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
   }
   
   function updatecontainers() {
-    docker.listContainers(containerlist)
+    docker.listContainers({'all': true}, containerlist)
+  }
+  
+  var oldvolume = null;
+  function volumelist(error, data) {
+    if (error)
+      return fail("list docker volumes failed", {
+        error: error, data: data
+      })
+    data = data.Volumes
+    if (data!=oldvolume)
+      broadcast("docker.volumes", data)
+    oldvolume = data
+  }
+  
+  function updatevolumes() {
+    docker.listVolumes(volumelist)
   }
 
   //==============================================================================
@@ -287,6 +310,7 @@ module.exports = function(app, io, updateContainerInterval, updateStatsInterval)
   function updateall() {
     updateimages()
     updatecontainers()
+    updatevolumes()
     updateservices()
     updatetasks()
     updatenodes()
