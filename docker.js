@@ -65,15 +65,24 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       'ranksep': 3
     }
 
-    this.standalone = (parameters = this.parameters, colors = this.colors) => {
+    this.header = (parameters = this.parameters) => {
       var res = "digraph {\n"
-              + "  node [style=filled];\n"
+              + '  node [style=filled];\n'
       for (var name in parameters) {
-        res += name+'="'+parameters[name]+'";\n'
+        res += '  '+name+'="'+parameters[name]+'";\n'
       }
+      return res
+    }
+
+    this.footer = () => {
+      return '}'
+    }
+
+    this.standalone = (colors = this.colors) => {
       var volumes = docker.volumes.get()
       var containers = docker.containers.get()
       var usedvolumes = {}
+      var res = ""
       containers.filter((c) => {
         return !c.Labels['com.docker.swarm.service.id']
       }).forEach((c) => {
@@ -138,26 +147,20 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
         res += '" [dir=none,style=dashed,label=<'+m.Destination+'<font point-size="10">:'
             +  (m.RW?'rw':'ro')+'</font>>];\n'
       }
-      return res += "}"
+      return res
     }
     
-    this.stack = (parameters = this.parameters, colors = this.colors) => {
-      var res = "digraph {\n"
-              + "  node [style=filled];\n"
-      for (var name in parameters) {
-        res += name+'="'+parameters[name]+'";\n'
-      }
+    this.stack = (colors = this.colors) => {
       var nodes = docker.nodes.get()
       var services = docker.services.get()
       var tasks = docker.tasks.get()
-      if (!Array.isArray(nodes)||!Array.isArray(services)||!Array.isArray(tasks))
-        return res+='"waiting for data";}'
       var ports = {};
       var stacks = services.map((s) => {
         return s.Spec.Labels['com.docker.stack.namespace']
       }).filter((s, i, a) => {
         return a.indexOf(s) === i
       })
+      var res = ""
       // ports
       res += (()=> {
         var res = ""
@@ -371,7 +374,6 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
               })
               return res
             })()
-            +"}"
       return res
     }
     
