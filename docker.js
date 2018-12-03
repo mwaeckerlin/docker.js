@@ -82,7 +82,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
     this.standalone = (colors = this.colors) => {
       var volumes = docker.volumes.get()
       var containers = docker.containers.get()
-      var usedvolumes = {}
+      var usedvolumes = new Set()
       var res = ""
       containers.filter((c) => {
         return !c.Labels['com.docker.swarm.service.id']
@@ -96,8 +96,9 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
             +  (url?',href="'+url+'"':'')+'];\n'
         // ports
         c.Ports.forEach((p) => {
-          res += '  "'+p.IP+':'+p.PublicPort+'" [label="'+p.PublicPort+'"];\n'
-              +  '  "'+p.IP+':'+p.PublicPort+'" -> "'+c.Id+'" [label="'+p.PrivatePort+'/'+p.Type+'"];\n'
+          if (p.PublicPort)
+            res += '  "'+p.IP+':'+p.PublicPort+'" [label="'+p.PublicPort+'"];\n'
+                +  '  "'+p.IP+':'+p.PublicPort+'" -> "'+c.Id+'" [label="'+p.PrivatePort+'/'+p.Type+'"];\n'
         })
         // links
         var links = c.Names.filter((n) => {return n.match(/^\/[^/]+\/[^/]+/)})
@@ -117,37 +118,56 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
             } break
             case 'volume': {
               var v = volumes.find((v) => {return v.Name==m.Name})
-              if (!v)
-                break
-              if (v.Driver=='local' && v.Mountpoint.match(/^\/var\/lib\/docker\/volumes\//)) {
-                usedvolumes[m.Name] = true
+              if (v) {
+                if (v.Driver=='local' && v.Mountpoint && v.Mountpoint.match(/^\/var\/lib\/docker\/volumes\//))
+                  usedvolumes.add(m.Name)
+                else
+                  res += '  "'+m.Name+'" [shape=box];\n'
+                      +  '  "'+c.Id+'" -> "'+m.Name
+                      +  '" [style=dashed,label=<'+m.Destination+'<font point-size="10">:'+(m.RW?'rw':'ro')+'</font>>];\n'
               } else {
-                res += '  "'+m.Name+'" [shape=box];\n'
-                    +  '  "'+name+'" -> "'+m.Name
-                    +  '" [style=dashed,label=<'+m.Destination+'<font point-size="10">:'+(m.RW?'rw':'ro')+'</font>>];\n'
+                if (!m.Source) {
+                  usedvolumes.add(m.Name)
+                } else {
+                  res += '  "'+m.Name+'" [shape=box,label="'+m.Source+'"];\n'
+                      +  '  "'+c.Id+'" -> "'+m.Name
+                      +  '" [style=dashed,label=<'+m.Destination+'<font point-size="10">:'+(m.RW?'rw':'ro')+'</font>>];\n'
+                }
               }
             } break
           }
         })
       })
       // handle volumes-from
-      for (var volname in usedvolumes) {
+      usedvolumes.forEach((volname) => {
         var m = null
-        res += '  "'
-            +  containers.filter((p) => {
-              return p.Mounts && p.Mounts.find((pm) => {
-                if (pm.Type=='volume' && pm.Name==volname) {
-                  m = pm
-                  return true
-                }
-                return false
-              })
-            }).map((p) => {
-              return p.Id
-            }).join('" -> "')
-        res += '" [dir=none,style=dashed,label=<'+m.Destination+'<font point-size="10">:'
-            +  (m.RW?'rw':'ro')+'</font>>];\n'
-      }
+        var cs = containers.filter((p) => {
+          return p.Mounts && p.Mounts.find((pm) => {
+            if (pm.Type=='volume' && pm.Name==volname) {
+              m = pm
+              return true
+            }
+            return false
+          })
+        })
+        
+        switch (cs.length) {
+          case 0: {
+            console.log('ERROR: CONTAINER VANISHED!') // theoretically impossible, wanna see
+          } break
+          case 1: {
+            // own data, ignored
+          } break
+          default: {
+            var first = cs.pop()
+            cs.forEach((c) => {
+              res += '  "'+c.Id+'" -> "'+first.Id
+                  +  '" [dir=none,style=dashed,label=<'+m.Destination+'<font point-size="10">:'
+                  +  (m.RW?'rw':'ro')+'</font>>];\n'
+            })
+          }
+        }
+      })
       return res
     }
     
