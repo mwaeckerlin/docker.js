@@ -1,10 +1,11 @@
 var Docker = function(socket, error, sigstack, sigcontainer) {
 
-  var focused = null;
-  var viz = null;
-  var vizmore = null;
-  var rankdir = "LR";
-  var docker = this;
+  var focused = null
+  var viz = null
+  var vizmore = null
+  var rankdir = "LR"
+  var paused = false
+  var docker = this
 
   function Graphics() {
     
@@ -154,7 +155,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       var nodes = docker.nodes.get()
       var services = docker.services.get()
       var tasks = docker.tasks.get()
-      var ports = {};
+      var ports = {}
       var stacks = services.map((s) => {
         return s.Spec.Labels['com.docker.stack.namespace']
       }).filter((s, i, a) => {
@@ -172,7 +173,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
           var protocol = null
           if (s.Endpoint && s.Endpoint.Ports)
             s.Endpoint.Ports.forEach((p) => {
-              ports[p.PublishedPort] = s;
+              ports[p.PublishedPort] = s
               if (lastport) {
                 if (protocol!=p.Protocol || p.PublishedPort>lastport+1) {
                   if (firstport==lastport)
@@ -386,7 +387,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
                             .replace(/>/g, '&gt;')
                             .split("\n")
         codelines.forEach(function(v, i, a) {
-            a[i] = ("000"+(i+1)).slice(-3)+": "+v;
+            a[i] = ("000"+(i+1)).slice(-3)+": "+v
           })
         throw({'msg': e, 'data': codelines.join("\n")})
       }
@@ -394,7 +395,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
   }
 
   function emit(signal, data) {
-    socket.emit(signal, data);
+    socket.emit(signal, data)
   }
 
   function same(array1, array2) {
@@ -403,7 +404,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
     return (array1.length == array2.length)
         && array1.every(function(element, index) {
           return element === array2[index]; 
-        });
+        })
   }
 
   function quote(text) {
@@ -412,27 +413,27 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
         if (!text.match("'")) return "'"+text+"'";
         else return '"'+text.replace(/"/g, '\\"')+'"';
       } else {
-        return '"'+text+'"';
+        return '"'+text+'"'
       }
     } else {
-      return text;
+      return text
     }
   }
   
-  var _docker = this;
+  var _docker = this
   
   this.Images = function() {
 
-    var _images = this;
-    var images = [];
-    var nodes = [];
+    var _images = this
+    var images = []
+    var nodes = []
     
     function setup() {
-      delete nodes; nodes = [];
+      delete nodes; nodes = []
       images.forEach(function(c, i) {
         if (!nodes[c.Id]) nodes[c.Id] = {};
-        nodes[c.Id].id = c.Id;
-        nodes[c.Id].tags = c.RepoTags;
+        nodes[c.Id].id = c.Id
+        nodes[c.Id].tags = c.RepoTags
         nodes[c.Id].created = c.Created;
         nodes[c.Id].author = c.Author;
         nodes[c.Id].os = c.Os+"/"+c.Architecture;
@@ -452,16 +453,16 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
         }
       });
     }
-    this.tags = function() {
+    this.tags = () => {
       var res = [];
       for (n in nodes) if (nodes[n].tags) res = res.concat(nodes[n].tags);
       return res;
     }
-    this.get = function(tag) {
+    this.get = (tag) => {
       for (n in nodes) if (nodes[n].tags && nodes[n].tags.indexOf(tag)>-1) return nodes[n];
       return null;
     }
-    this.cleanup = function(id, instance) {
+    this.cleanup = (id, instance) => {
       if (!nodes[id]) return
       nodes[id].env.forEach(function(e) {
         if ((pos=instance.env.indexOf(e))>-1) instance.env.splice(pos, 1)
@@ -469,16 +470,16 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       if (same(nodes[id].cmd, instance.cmd)) instance.cmd = null
       if (same(nodes[id].entrypoint, instance.entrypoint)) instance.entrypoint = null
     }
-    this.set = function(c) {
+    this.set = (c) => {
       if (typeof c == "string") c = JSON.parse(c);
-      if (typeof c != "object") throw "wrong format: "+(typeof c);
+      if (typeof c != "object") throw {'msg': "wrong format: "+(typeof c), 'data': c};
       images = c;
       setup();
     }
     
   }
   
-  this.Containers = function() {
+  this.Containers = () => {
 
     var _containers = this;
     
@@ -529,7 +530,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       if (port.toString().match("22")) return "ssh://";
       return "http://";
     }
-    this.exists = function(name) {
+    this.exists = (name) => {
       if (nodes[name]) return true;
       return false;
     }
@@ -613,7 +614,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       });
       return res;
     }
-    this.graph = function(n) {
+    this.graph = (n) => {
       var res = "";
       var ips = [];
       n = n || nodes;
@@ -647,15 +648,15 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
         if (!ns[peer]) addNodes(ns, peer);
       });
     }
-    this.subnet = function(name, nodes) {
+    this.subnet = (name, nodes) => {
       var ns = nodes || {};
       addNodes(ns, name);
       return ns;
     }
-    this.subgraph = function(name, nodes) {
+    this.subgraph = (name, nodes) => {
       return this.graph(this.subnet(name, nodes));
     }
-    this.configuration = function(name) {
+    this.configuration = (name) => {
       var ns = name;
       if (typeof name == 'string') ns = this.subnet(name);
       var creates = [];
@@ -694,7 +695,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       });
       return creates;
     }
-    this.creation = function(configuration) {
+    this.creation = (configuration) => {
       var res = [];
       if (typeof configuration === 'string')
         configuration = JSON.parse(configuration);
@@ -729,7 +730,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
       }
       return res;
     }
-    this.names = function(more) {
+    this.names = (more) => {
       if (more) return Object.keys(nodes).concat(Object.keys(more))
         else return Object.keys(nodes);
     }
@@ -827,7 +828,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
         })
       }
     }
-    this.contextmenu = function(selector) {
+    this.contextmenu = (selector) => {
       $('a[xlink\\:href^="#"]').click(function(e) {
         var name = $(this).attr("xlink:href").replace(/^#/, "");
         var n = nodes[name];
@@ -898,26 +899,52 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
         $("#popup").show();
       })
     }
-    this.set = function(c) {
+    this.set = (c) => {
       if (typeof c == "string") c = JSON.parse(c);
-      if (typeof c != "object") throw "wrong format: "+(typeof c);
+      if (typeof c != "object") throw {'msg': "wrong format: "+(typeof c), 'data': c};
       containers = c;
       setup();
     }
   }
 
+  this.upload = (data) => {
+    if (!data || !data.containers || !data.volumes || !data.nodes || !data.services || !data.tasks)
+      return false
+    docker.pause()
+    docker.containers.set(data.containers)
+    docker.volumes.set(data.volumes)
+    docker.nodes.set(data.nodes)
+    docker.services.set(data.services)
+    docker.tasks.set(data.tasks)
+    if (sigstack) sigstack();
+    if (sigcontainer) sigcontainer();
+    return true
+  }
+
+  this.pause = () => {
+    docker.paused = true
+  }
+
+  this.unpause = () => {
+    docker.paused = false
+    emit("docker.containers")
+    emit("docker.volumes")
+    emit("docker.nodes")
+    emit("docker.services")
+    emit("docker.tasks")
+  }
 
   this.Storage = function() {
 
     var storage = []
 
-    this.get = function() {
+    this.get = () => {
       return storage
     }
 
-    this.set = function(c) {
+    this.set = (c) => {
       if (typeof c == "string") c = JSON.parse(c);
-      if (typeof c != "object") throw "wrong format: "+(typeof c);
+      if (typeof c != "object") throw {'msg': "wrong format: "+(typeof c), 'data': c};
       storage = c;
     }
     
@@ -931,7 +958,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
   this.images = new this.Images();
   this.nodes = new this.Storage()
 
-  this.rotate = function() {
+  this.rotate = () => {
     if (!viz) return;
     if (rankdir == "LR")
       rankdir = "TB";
@@ -940,7 +967,7 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
     docker.show();
   }
 
-  this.show = function(vizpath, more) {
+  this.show = (vizpath, more) => {
     if (!container_element) return;
     if (!vizpath) {
       vizpath = viz;
@@ -981,26 +1008,31 @@ var Docker = function(socket, error, sigstack, sigcontainer) {
   }
 
   function sigcontainers(c) {
+    if (docker.paused) return;
     docker.containers.set(c)
     if (sigcontainer) sigcontainer()
   }
   
   function sigvolumes(c) {
+    if (docker.paused) return;
     docker.volumes.set(c)
     if (sigcontainer) sigcontainer()
   }
   
   function signodes(c) {
+    if (docker.paused) return;
     docker.nodes.set(c)
     if (sigstack) sigstack()
   }
   
   function sigservices(c) {
+    if (docker.paused) return;
     docker.services.set(c)
     if (sigstack) sigstack()
   }
   
   function sigtasks(c) {
+    if (docker.paused) return;
     docker.tasks.set(c)
     if (sigstack) sigstack()
   }
