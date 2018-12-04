@@ -1,6 +1,6 @@
 {
   "name": "docker.js",
-  "version": "1.4.16",
+  "version": "2.0.0",
   "description": "NodeJS Module for Handling and Displaying Docker Information, updating to support swarm",
   "main": "index.js",
   "scripts": {
@@ -21,10 +21,8 @@
   },
   "homepage": "https://github.com/mwaeckerlin/docker.js#readme",
   "dependencies": {
-    "child_process": "^1.0.2",
     "dockerode": "^2.5.7",
     "jquery": "^3.1.1",
-    "pty.js": "^0.3.1",
     "viz.js": "^1.4.1"
   }
 }
